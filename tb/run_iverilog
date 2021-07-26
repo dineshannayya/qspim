@@ -1,0 +1,2 @@
+iverilog -g2005-sv  -D SPEEDSIM   -I ../src -I ../model -I $PDK_ROOT/sky130A  tb_top.v  -o tb_top.vvp
+vvp tb_top.vvp
