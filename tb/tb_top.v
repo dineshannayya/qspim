@@ -162,10 +162,17 @@ parameter P_FSM_CR     = 4'b1011;  // COMMAND -> READ
 	reg         test_fail;
 	reg [31:0] read_data;
 
-        wire [3:0]   io_in    ;
-        wire  [5:0]  io_out   ;
-        wire  [5:0]  io_oeb   ;
-
+        wire flash_clk;
+        wire flash_csb;
+        wire spi_sdo0;
+        wire spi_sdo1;
+        wire spi_sdo2;
+        wire spi_sdo3;
+        wire io_oeb;
+        tri  flash_io0;
+        tri  flash_io1;
+        tri  flash_io2;
+        tri  flash_io3;
 
 	// External clock is used by default.  Make this artificially fast for the
 	// simulation.  Normally this would be a slow clock and the digital PLL
@@ -1043,9 +1050,17 @@ spim_top u_top(
 
  
     // IOs
-    .io_in          (io_in)  ,
-    .io_out         (io_out) ,
-    .io_oeb         (io_oeb) 
+    .spi_sdi0    (flash_io0),
+    .spi_sdi1    (flash_io1),
+    .spi_sdi2    (flash_io2),
+    .spi_sdi3    (flash_io3),
+    .spi_clk     (flash_clk),
+    .spi_csn0    (flash_csb),
+    .spi_sdo0    (spi_sdo0),
+    .spi_sdo1    (spi_sdo1),
+    .spi_sdo2    (spi_sdo2),
+    .spi_sdo3    (spi_sdo3),
+    .spi_oeb     (spi_oeb)
 
 
 );
@@ -1055,23 +1070,13 @@ spim_top u_top(
 //  user core using the gpio pads
 //  ----------------------------------------------------
 
-   wire flash_clk = io_out[0];
-   wire flash_csb = io_out[1];
-
    // Modeling the Pad Delay
-   wire #1 io_oeb_2 = io_oeb[2];
-   wire #1 io_oeb_3 = io_oeb[3];
-   wire #1 io_oeb_4 = io_oeb[4];
-   wire #1 io_oeb_5 = io_oeb[5];
-   tri  flash_io0 = (io_oeb_2== 1'b0) ? io_out[2] : 1'bz;
-   tri  flash_io1 = (io_oeb_3== 1'b0) ? io_out[3] : 1'bz;
-   tri  flash_io2 = (io_oeb_4== 1'b0) ? io_out[4] : 1'bz;
-   tri  flash_io3 = (io_oeb_5== 1'b0) ? io_out[5] : 1'bz;
+   assign #1 io_oeb = spi_oeb;
+   assign flash_io0 = (io_oeb== 1'b0) ? spi_sdo0 : 1'bz;
+   assign flash_io1 = (io_oeb== 1'b0) ? spi_sdo1 : 1'bz;
+   assign flash_io2 = (io_oeb== 1'b0) ? spi_sdo2 : 1'bz;
+   assign flash_io3 = (io_oeb== 1'b0) ? spi_sdo3 : 1'bz;
 
-   assign io_in[0] = flash_io0;
-   assign io_in[1] = flash_io1;
-   assign io_in[2] = flash_io2;
-   assign io_in[3] = flash_io3;
 
    /***
 
@@ -1105,64 +1110,6 @@ spim_top u_top(
        );
 
 
-`ifndef GL // Drive Power for Hold Fix Buf
-    // All standard cell need power hook-up for functionality work
-    initial begin
-	force u_top.u_delay1_sdio0.VPWR =USER_VDD1V8;
-	force u_top.u_delay1_sdio0.VPB  =USER_VDD1V8;
-	force u_top.u_delay1_sdio0.VGND =VSS;
-	force u_top.u_delay1_sdio0.VNB = VSS;
-	force u_top.u_delay2_sdio0.VPWR =USER_VDD1V8;
-	force u_top.u_delay2_sdio0.VPB  =USER_VDD1V8;
-	force u_top.u_delay2_sdio0.VGND =VSS;
-	force u_top.u_delay2_sdio0.VNB = VSS;
-	force u_top.u_buf_sdio0.VPWR   =USER_VDD1V8;
-	force u_top.u_buf_sdio0.VPB    =USER_VDD1V8;
-	force u_top.u_buf_sdio0.VGND   =VSS;
-	force u_top.u_buf_sdio0.VNB    =VSS;
-
-	force u_top.u_delay1_sdio1.VPWR =USER_VDD1V8;
-	force u_top.u_delay1_sdio1.VPB  =USER_VDD1V8;
-	force u_top.u_delay1_sdio1.VGND =VSS;
-	force u_top.u_delay1_sdio1.VNB = VSS;
-	force u_top.u_delay2_sdio1.VPWR =USER_VDD1V8;
-	force u_top.u_delay2_sdio1.VPB  =USER_VDD1V8;
-	force u_top.u_delay2_sdio1.VGND =VSS;
-	force u_top.u_delay2_sdio1.VNB = VSS;
-	force u_top.u_buf_sdio1.VPWR   =USER_VDD1V8;
-	force u_top.u_buf_sdio1.VPB    =USER_VDD1V8;
-	force u_top.u_buf_sdio1.VGND   =VSS;
-	force u_top.u_buf_sdio1.VNB    =VSS;
-
-	force u_top.u_delay1_sdio2.VPWR =USER_VDD1V8;
-	force u_top.u_delay1_sdio2.VPB  =USER_VDD1V8;
-	force u_top.u_delay1_sdio2.VGND =VSS;
-	force u_top.u_delay1_sdio2.VNB = VSS;
-	force u_top.u_delay2_sdio2.VPWR =USER_VDD1V8;
-	force u_top.u_delay2_sdio2.VPB  =USER_VDD1V8;
-	force u_top.u_delay2_sdio2.VGND =VSS;
-	force u_top.u_delay2_sdio2.VNB = VSS;
-	force u_top.u_buf_sdio2.VPWR   =USER_VDD1V8;
-	force u_top.u_buf_sdio2.VPB    =USER_VDD1V8;
-	force u_top.u_buf_sdio2.VGND   =VSS;
-	force u_top.u_buf_sdio2.VNB    =VSS;
-
-	force u_top.u_delay1_sdio3.VPWR =USER_VDD1V8;
-	force u_top.u_delay1_sdio3.VPB  =USER_VDD1V8;
-	force u_top.u_delay1_sdio3.VGND =VSS;
-	force u_top.u_delay1_sdio3.VNB = VSS;
-	force u_top.u_delay2_sdio3.VPWR =USER_VDD1V8;
-	force u_top.u_delay2_sdio3.VPB  =USER_VDD1V8;
-	force u_top.u_delay2_sdio3.VGND =VSS;
-	force u_top.u_delay2_sdio3.VNB = VSS;
-	force u_top.u_buf_sdio3.VPWR   =USER_VDD1V8;
-	force u_top.u_buf_sdio3.VPB    =USER_VDD1V8;
-	force u_top.u_buf_sdio3.VGND   =VSS;
-	force u_top.u_buf_sdio3.VNB    =VSS;
-          
-
-    end
-`endif    
 
 
 task wb_user_core_write;
