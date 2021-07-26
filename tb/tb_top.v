@@ -85,9 +85,6 @@
  `else
      `define USE_POWER_PINS
      `define UNIT_DELAY #0.1
-     `include "libs.ref/sky130_fd_sc_hd/verilog/primitives.v"
-     `include "libs.ref/sky130_fd_sc_hd/verilog/sky130_fd_sc_hd.v"
-     `include "libs.ref/sky130_fd_sc_hvl/verilog/primitives.v"
      `include "spim_ctrl.sv"
      `include "spim_tx.sv"
      `include "spim_rx.sv"
@@ -168,11 +165,16 @@ parameter P_FSM_CR     = 4'b1011;  // COMMAND -> READ
         wire spi_sdo1;
         wire spi_sdo2;
         wire spi_sdo3;
+        wire spi_oeb;
         wire io_oeb;
         tri  flash_io0;
         tri  flash_io1;
         tri  flash_io2;
         tri  flash_io3;
+        wire in_d0 ;
+        wire in_d1 ;
+        wire in_d2 ;
+        wire in_d3 ;
 
 	// External clock is used by default.  Make this artificially fast for the
 	// simulation.  Normally this would be a slow clock and the digital PLL
@@ -213,6 +215,31 @@ parameter P_FSM_CR     = 4'b1011;  // COMMAND -> READ
 		wb_user_core_write(32'h1000000C,{15'h0,1'b0,2'b00,2'b00,4'b0001});
 		wb_user_core_write(32'h10000010,{8'h4,2'b00,2'b00,4'b1011,8'h00,8'h9F});
 		wb_user_core_read_check(32'h1000001C,read_data,32'h00190201);
+		$display("#############################################");
+		$display("Testing Direct SPI Memory Read              ");
+		$display(" SPI Mode: QDDR (Dual 4 but)                ");
+		$display("Prefetch : 1DW, OPCODE:READ(0xED)           ");
+		$display("SEQ: Command -> Address -> Read Data        ");
+		$display("#############################################");
+		// QDDR Config
+		wb_user_core_write(32'h10000004,{24'h0,2'b01,2'b11,4'b0001});
+		wb_user_core_write(32'h10000008,{8'h04,2'b01,2'b10,4'h6,8'h00,8'hED});
+		wb_user_core_read_check(32'h00000200,read_data,32'h00000093);
+		wb_user_core_read_check(32'h00000204,read_data,32'h00000113);
+		wb_user_core_read_check(32'h00000208,read_data,32'h00000193);
+		wb_user_core_read_check(32'h0000020C,read_data,32'h00000213);
+		wb_user_core_read_check(32'h00000210,read_data,32'h00000293);
+		wb_user_core_read_check(32'h00000214,read_data,32'h00000313);
+		wb_user_core_read_check(32'h00000218,read_data,32'h00000393);
+		wb_user_core_read_check(32'h0000021C,read_data,32'h00000413);
+		wb_user_core_read_check(32'h00000400,read_data,32'h11223737);
+		wb_user_core_read_check(32'h00000404,read_data,32'h300007b7);
+		wb_user_core_read_check(32'h00000408,read_data,32'h34470293);
+		wb_user_core_read_check(32'h0000040C,read_data,32'h22334337);
+		wb_user_core_read_check(32'h00000410,read_data,32'h0057ac23);
+		wb_user_core_read_check(32'h00000414,read_data,32'h45530393);
+		wb_user_core_read_check(32'h00000418,read_data,32'h33445537);
+		wb_user_core_read_check(32'h0000041C,read_data,32'h0077ae23);
 		$display("#############################################");
 		$display("Testing Direct SPI Memory Read              ");
 		$display(" SPI Mode: Normal/Single Bit                ");
@@ -290,7 +317,7 @@ parameter P_FSM_CR     = 4'b1011;  // COMMAND -> READ
 		$display("#############################################");
 		$display("Testing Direct SPI Memory Read with Prefetch");
 		$display(" SPI Mode: Quad                             ");
-		$display("Prefetch : 8DW, OPCODE:URAD READ(0xEB)      ");
+		$display("Prefetch : 8DW, OPCODE:QUAD READ(0xEB)      ");
 		$display("SEQ: Command -> Address -> Dummy -> Read Data");
 		$display("#############################################");
 		wb_user_core_write(32'h10000004,{24'h0,2'b01,2'b10,4'b0001});
@@ -1050,10 +1077,10 @@ spim_top u_top(
 
  
     // IOs
-    .spi_sdi0    (flash_io0),
-    .spi_sdi1    (flash_io1),
-    .spi_sdi2    (flash_io2),
-    .spi_sdi3    (flash_io3),
+    .spi_sdi0    (in_d0),
+    .spi_sdi1    (in_d1),
+    .spi_sdi2    (in_d2),
+    .spi_sdi3    (in_d3),
     .spi_clk     (flash_clk),
     .spi_csn0    (flash_csb),
     .spi_sdo0    (spi_sdo0),
@@ -1072,11 +1099,19 @@ spim_top u_top(
 
    // Modeling the Pad Delay
    assign #1 io_oeb = spi_oeb;
-   assign flash_io0 = (io_oeb== 1'b0) ? spi_sdo0 : 1'bz;
-   assign flash_io1 = (io_oeb== 1'b0) ? spi_sdo1 : 1'bz;
-   assign flash_io2 = (io_oeb== 1'b0) ? spi_sdo2 : 1'bz;
-   assign flash_io3 = (io_oeb== 1'b0) ? spi_sdo3 : 1'bz;
+   wire #1 io_d0 = spi_sdo0;
+   wire #1 io_d1 = spi_sdo1;
+   wire #1 io_d2 = spi_sdo2;
+   wire #1 io_d3 = spi_sdo3;
+   assign flash_io0 = (io_oeb== 1'b0) ? io_d0 : 1'bz;
+   assign flash_io1 = (io_oeb== 1'b0) ? io_d1 : 1'bz;
+   assign flash_io2 = (io_oeb== 1'b0) ? io_d2 : 1'bz;
+   assign flash_io3 = (io_oeb== 1'b0) ? io_d3 : 1'bz;
 
+   assign #1 in_d0 = flash_io0;
+   assign #1 in_d1 = flash_io1;
+   assign #1 in_d2 = flash_io2;
+   assign #1 in_d3 = flash_io3;
 
    /***
 

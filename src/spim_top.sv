@@ -445,7 +445,7 @@ spim_if #( .WB_WIDTH(WB_WIDTH)) u_wb_if(
         .spi_sdi1                       (spi_sdi1                     ),
         .spi_sdi2                       (spi_sdi2                     ),
         .spi_sdi3                       (spi_sdi3                     ),
-	.spi_en_tx                      (spi_en_tx                    )
+	.spi_en_tx_out                      (spi_en_tx                    )
     );
 
 endmodule
