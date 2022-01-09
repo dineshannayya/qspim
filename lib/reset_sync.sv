@@ -17,19 +17,14 @@
 //
 //////////////////////////////////////////////////////////////////////
 ////                                                              ////
-////  SPI Clkgen  Module                                          ////
+////  Active low reset synchronization                           ////
 ////                                                              ////
-////  This file is part of the YIFive cores project               ////
+////  This file is part of the yifive cores project               ////
 ////  https://github.com/dineshannayya/yifive_r0.git              ////
 ////  http://www.opencores.org/cores/yifive/                      ////
 ////                                                              ////
-////  Description                                                 ////
-////      This is SPI Master Clock Generation control logic.      ////
-////      This logic also generate spi clock rise and fall pulse  ////
-////      Basis assumption is master clock is 2x time spi clock   ////
-////         1. spi fall pulse is used to transmit spi data       ////
-////         2. spi rise pulse is used to received spi data       ////
-////     SPI Master Top module                                    ////
+////  Description:                                                ////
+////     Synchronize the active low reset to destination clock    ////
 ////                                                              ////
 ////  To Do:                                                      ////
 ////    nothing                                                   ////
@@ -37,12 +32,9 @@
 ////  Author(s):                                                  ////
 ////      - Dinesh Annayya, dinesha@opencores.org                 ////
 ////                                                              ////
-////  Revision:                                                   ////
-////      0.1 - 16th Feb 2021, Dinesh A                           ////
-////            Initial version                                   ////
-////      0.2 - 24th Mar 2021, Dinesh A                           ////
-////            1. Comments are added                             ////
-////            2. RTL clean-up done and the output are registred ////
+////  Revision :                                                  ////
+////     v0:    June 17, 2021, Dinesh A                           ////
+////             Initial version                                  ////
 ////                                                              ////
 //////////////////////////////////////////////////////////////////////
 ////                                                              ////
@@ -71,76 +63,39 @@
 ////                                                              ////
 //////////////////////////////////////////////////////////////////////
 
-module spim_clkgen
-(
-    input  logic                        clk,
-    input  logic                        rstn,
-    input  logic                        en,
-    input  logic          [5:0]         cfg_sck_period,
-    output logic                        spi_clk,
-    output logic                        spi_fall,
-    output logic                        spi_rise
-);
+module reset_sync   (
+	      scan_mode  ,
+              dclk       , // Destination clock domain
+	      arst_n     , // active low async reset
+              srst_n 
+          );
 
-	logic [5:0] sck_half_period;
-	logic [5:0] clk_cnt;
+parameter WIDTH = 1;
 
-    assign sck_half_period = {1'b0, cfg_sck_period[5:1]};
-   
-    // The first transition on the sck_toggle happens one SCK period
-    // after en is asserted
-    always @(posedge clk or negedge rstn) begin
-    	if(!rstn) begin
-    	   spi_clk    <= 1'b1;
-    	end // if (!reset_n)
-    	else 
-    	begin
-    	   if(en) 
-    	   begin
-    	      if(clk_cnt == sck_half_period) 
-    	      begin
-    		 spi_clk    <= 1'b0;
-    	      end // if (clk_cnt == sck_half_period)
-    	      else if(clk_cnt == cfg_sck_period) begin
-    		    spi_clk    <= 1'b1;
-    	      end 
-    	   end else begin
-    	      spi_clk    <= 1'b1;
-    	   end // else: !if(en)
-    	end // else: !if(!reset_n)
-    end // always @ (posedge clk or negedge reset_n)
+input    scan_mode  ; // test mode
+input    dclk       ; // Destination clock
+input    arst_n     ; // Async Reset
+output   srst_n     ; // Sync Reset w.r.t dclk
 
-    // Generate Free runnng spi_fall and rise pulse
-    // after en is asserted
-    always @(posedge clk or negedge rstn) begin
-    	if(!rstn) begin
-    	   clk_cnt    <= 'h1;
-	   spi_fall   <= 1'b0;
-	   spi_rise   <= 1'b0;
-    	end // if (!reset_n)
-    	else 
-    	begin
-    	   if(clk_cnt == sck_half_period) 
-    	   begin
-	      spi_fall   <= 1'b0;
-	      spi_rise   <= 1'b1;
-    	      clk_cnt    <= clk_cnt + 1'b1;
-    	   end // if (clk_cnt == sck_half_period)
-    	   else begin
-    	      if(clk_cnt == cfg_sck_period) 
-    	      begin
-	         spi_fall   <= 1'b1;
-	         spi_rise   <= 1'b0;
-    	         clk_cnt    <= 'h1;
-    	      end // if (clk_cnt == cfg_sck_period)
-    	      else 
-    	      begin
-    	         clk_cnt    <= clk_cnt + 1'b1;
-	         spi_fall   <= 1'b0;
-	         spi_rise   <= 1'b0;
-    	       end // else: !if(clk_cnt == cfg_sck_period)
-    	   end // else: !if(clk_cnt == sck_half_period)
-    	end // else: !if(!reset_n)
-    end // always @ (posedge clk or negedge reset_n)
+
+reg      in_data_s  ; // One   Cycle sync 
+reg      in_data_2s ; // two   Cycle sync 
+
+assign srst_n =  (scan_mode) ? arst_n : in_data_2s;
+
+always @(negedge arst_n  or posedge dclk)
+begin
+   if(arst_n == 1'b0)
+   begin
+      in_data_s  <= 1'b0;
+      in_data_2s <= 1'b0;
+   end
+   else
+   begin
+      in_data_s  <= 1'b1;
+      in_data_2s <= in_data_s;
+   end
+end
+
 
 endmodule

@@ -69,7 +69,7 @@
 //////////////////////////////////////////////////////////////////////
 
 
-module spim_if #( parameter WB_WIDTH = 32) (
+module qspim_if #( parameter WB_WIDTH = 32) (
     input  logic                         mclk,
     input  logic                         rst_n,
 

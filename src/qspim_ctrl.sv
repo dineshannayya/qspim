@@ -60,7 +60,7 @@
 //// from http://www.opencores.org/lgpl.shtml                     ////
 ////                                                              ////
 //////////////////////////////////////////////////////////////////////
-module spim_ctrl  #(
+module qspim_ctrl  #(
      parameter ENDIEAN = 0  // 0 - Little, 1 - Big endian, since RISV is Little indian default set 0
      )
 
@@ -310,7 +310,7 @@ parameter P_FSM_CR     = 4'b1011;  // COMMAND -> READ
 
   assign spi_en_tx_out  = (spi_en_tx) && (spi_dummy ==0); // Don't Drive Tx On Dummy Phase
 
-  spim_clkgen u_clkgen
+  qspim_clkgen u_clkgen
   (
     .clk            ( clk                    ),
     .rstn           ( rstn                   ),
@@ -320,7 +320,7 @@ parameter P_FSM_CR     = 4'b1011;  // COMMAND -> READ
     .spi_fall       ( spi_fall               ),
     .spi_rise       ( spi_rise               )
   );
-  spim_tx u_txreg
+  qspim_tx u_txreg
   (
     .clk            ( clk                    ),
     .rstn           ( rstn                   ),
@@ -342,7 +342,7 @@ parameter P_FSM_CR     = 4'b1011;  // COMMAND -> READ
     .spi_dummy      ( spi_dummy              ),
     .clk_en_o       ( tx_clk_en              )
   );
-  spim_rx #(.ENDIEAN(ENDIEAN)) u_rxreg
+  qspim_rx #(.ENDIEAN(ENDIEAN)) u_rxreg
   (
     .clk            ( clk                    ),
     .rstn           ( rstn                   ),
@@ -718,4 +718,3 @@ end
   end
 
 endmodule
-

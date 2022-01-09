@@ -66,6 +66,10 @@
 ////            with in 8DW or 32 Byte, else there is chance      ////
 ////            data path can hang due to response FIFO full due  ////
 ////            to partial reading of data                        ////
+////     V.4  -  July 26, 2021                                    ////
+////             QDDR (0xED) supported is added                   ////
+////     V.5  -  Nov 6, 2021                                      ////
+////             Clock Skew Moves inside the block                ////
 ////                                                              ////
 //////////////////////////////////////////////////////////////////////
 ////                                                              ////
@@ -96,12 +100,20 @@
 
 
 
-module spim_top
+module qspim_top
 #( parameter WB_WIDTH = 32)
 (
+`ifdef USE_POWER_PINS
+         input logic            vccd1,    // User area 1 1.8V supply
+         input logic            vssd1,    // User area 1 digital ground
+`endif
     input  logic                          mclk,
     input  logic                          rst_n,
 
+    input  logic   [3:0]                 cfg_cska_sp_co, // spi clock skew adjust
+    input  logic   [3:0]                 cfg_cska_spi,
+    input  logic                         wbd_clk_int,
+    output logic                         wbd_clk_spi,
 
     input  logic                         wbd_stb_i, // strobe/request
     input  logic   [WB_WIDTH-1:0]        wbd_adr_i, // address
@@ -115,18 +127,11 @@ module spim_top
     output logic                 [31:0]  spi_debug,
 
     // PAD I/f
-    input logic                          spi_sdi0,
-    input logic                          spi_sdi1,
-    input logic                          spi_sdi2,
-    input logic                          spi_sdi3,
+    input logic [3:0]                    spi_sdi,
     output logic                         spi_clk,
     output logic                         spi_csn0,// No hold fix for CS#, as it asserted much eariler than SPI clock
-    output logic                         spi_sdo0,
-    output logic                         spi_sdo1,
-    output logic                         spi_sdo2,
-    output logic                         spi_sdo3,
-    output logic                         spi_oeb
-
+    output logic [3:0]                   spi_sdo,
+    output logic [3:0]                   spi_oen
 );
 
 
@@ -220,13 +225,78 @@ logic                          spi_csn3;
 logic                    [1:0] spi_mode;
 logic                          spi_en_tx;
 logic                          spi_init_done;
+logic  [3:0]                   spi_sdo_int;
+logic                          spi_clk_int;
+logic                          spi_sdo0_dl;
+logic                          spi_sdo1_dl;
+logic                          spi_sdo2_dl;
+logic                          spi_sdo3_dl;
+logic                          rst_ss_n;
 
 
-assign  spi_oeb = !spi_en_tx;
 
-spim_if #( .WB_WIDTH(WB_WIDTH)) u_wb_if(
+// ADDing Delay cells for Interface hold fix
+wire spi_sdo0_d1,spi_sdo0_d2;
+ctech_delay_buf u_delay1_sdio0 (.X(spi_sdo0_d1),.A(spi_sdo_int[0]));
+ctech_delay_buf u_delay2_sdio0 (.X(spi_sdo0_d2),.A(spi_sdo0_d1));
+ctech_buf u_buf_sdio0    (.X(spi_sdo[0]),.A(spi_sdo0_d2));
+
+wire spi_sdo1_d1,spi_sdo1_d2;
+ctech_delay_buf u_delay1_sdio1 (.X(spi_sdo1_d1),.A(spi_sdo_int[1]));
+ctech_delay_buf u_delay2_sdio1 (.X(spi_sdo1_d2),.A(spi_sdo1_d1));
+ctech_buf u_buf_sdio1    (.X(spi_sdo[1]),.A(spi_sdo1_d2));
+
+wire spi_sdo2_d1,spi_sdo2_d2;
+ctech_delay_buf u_delay1_sdio2 (.X(spi_sdo2_d1),.A(spi_sdo_int[2]));
+ctech_delay_buf u_delay2_sdio2 (.X(spi_sdo2_d2),.A(spi_sdo2_d1));
+ctech_buf u_buf_sdio2    (.X(spi_sdo[2]),.A(spi_sdo2_d2));
+
+wire spi_sdo3_d1,spi_sdo3_d2;
+ctech_delay_buf u_delay1_sdio3 (.X(spi_sdo3_d1),.A(spi_sdo_int[3]));
+ctech_delay_buf u_delay2_sdio3 (.X(spi_sdo3_d2),.A(spi_sdo3_d1));
+ctech_buf u_buf_sdio3    (.X(spi_sdo[3]),.A(spi_sdo3_d2));
+
+
+assign   #1 spi_oen[0] = !spi_en_tx;  // SPI_DIO0
+assign   #1 spi_oen[1] = !spi_en_tx;  // SPI_DIO1
+assign   #1 spi_oen[2] =  (spi_mode == 0) ? 1 'b0 : !spi_en_tx;   // HOLD
+assign   #1 spi_oen[3] =  (spi_mode == 0) ? 1 'b0 : !spi_en_tx;   // 
+
+// spi clock skew control
+clk_skew_adjust u_skew_spi
+       (
+`ifdef USE_POWER_PINS
+               .vccd1      (vccd1                      ),// User area 1 1.8V supply
+               .vssd1      (vssd1                      ),// User area 1 digital ground
+`endif
+	       .clk_in     (wbd_clk_int                ), 
+	       .sel        (cfg_cska_spi               ), 
+	       .clk_out    (wbd_clk_spi                ) 
+       );
+
+// Clock Skey for SPI clock out
+clk_skew_adjust u_skew_sp_co
+       (
+`ifdef USE_POWER_PINS
+               .vccd1      (vccd1                      ),// User area 1 1.8V supply
+               .vssd1      (vssd1                      ),// User area 1 digital ground
+`endif
+	       .clk_in     (spi_clk_int                ), 
+	       .sel        (cfg_cska_sp_co             ), 
+	       .clk_out    (spi_clk                    ) 
+       );
+//###################################
+// Application Reset Synchronization
+//###################################
+reset_sync  u_app_rst (
+	      .scan_mode  (1'b0        ),
+              .dclk       (mclk        ), // Destination clock domain
+	      .arst_n     (rst_n       ), // active low async reset
+              .srst_n     (rst_ss_n    )
+          );
+qspim_if #( .WB_WIDTH(WB_WIDTH)) u_wb_if(
         .mclk                           (mclk                         ),
-        .rst_n                          (rst_n                        ),
+        .rst_n                          (rst_ss_n                     ),
 
         .wbd_stb_i                      (wbd_stb_i                    ), // strobe/request
         .wbd_adr_i                      (wbd_adr_i                    ), // address
@@ -272,14 +342,14 @@ spim_if #( .WB_WIDTH(WB_WIDTH)) u_wb_if(
     );
 
 
-    spim_regs
+qspim_regs
     #(
         .WB_WIDTH(WB_WIDTH)
     )
     u_spim_regs
     (
         .mclk                           (mclk                         ),
-        .rst_n                          (rst_n                        ),
+        .rst_n                          (rst_ss_n                     ),
 	.fast_sim_mode                  (1'b0                         ),
 
         .spi_clk_div                    (spi_clk_div                  ),
@@ -331,9 +401,9 @@ spim_if #( .WB_WIDTH(WB_WIDTH)) u_wb_if(
     );
 
  // Master 0 Command FIFO
- spim_fifo #(.W(34), .DP(2)) u_m0_cmd_fifo (
+qspim_fifo #(.W(34), .DP(2)) u_m0_cmd_fifo (
 	 .clk                           (mclk                        ),
-         .reset_n                       (rst_n                       ),
+         .reset_n                       (rst_ss_n                    ),
 	 .flush                         (1'b0                        ),
          .wr_en                         (m0_cmd_fifo_wr              ),
          .wr_data                       (m0_cmd_fifo_wdata           ),
@@ -346,9 +416,9 @@ spim_if #( .WB_WIDTH(WB_WIDTH)) u_wb_if(
    );
 
  // Master 0 Response FIFO
- spim_fifo #(.W(32), .DP(8)) u_m0_res_fifo (
+qspim_fifo #(.W(32), .DP(8)) u_m0_res_fifo (
 	 .clk                           (mclk                        ),
-         .reset_n                       (rst_n                       ),
+         .reset_n                       (rst_ss_n                    ),
 	 .flush                         (m0_res_fifo_flush           ),
          .wr_en                         (m0_res_fifo_wr              ),
          .wr_data                       (m0_res_fifo_wdata           ),
@@ -361,9 +431,9 @@ spim_if #( .WB_WIDTH(WB_WIDTH)) u_wb_if(
    );
 
  // Master 1 Command FIFO
- spim_fifo #(.W(34), .DP(4)) u_m1_cmd_fifo (
+qspim_fifo #(.W(34), .DP(4)) u_m1_cmd_fifo (
 	 .clk                           (mclk                        ),
-         .reset_n                       (rst_n                       ),
+         .reset_n                       (rst_ss_n                    ),
 	 .flush                         (1'b0                        ),
          .wr_en                         (m1_cmd_fifo_wr              ),
          .wr_data                       (m1_cmd_fifo_wdata           ),
@@ -375,9 +445,9 @@ spim_if #( .WB_WIDTH(WB_WIDTH)) u_wb_if(
          .rd_data                       (m1_cmd_fifo_rdata           )
    );
  // Master 1 Response FIFO
- spim_fifo #(.W(32), .DP(8)) u_m1_res_fifo (
+qspim_fifo #(.W(32), .DP(8)) u_m1_res_fifo (
 	 .clk                           (mclk                        ),
-         .reset_n                       (rst_n                       ),
+         .reset_n                       (rst_ss_n                    ),
 	 .flush                         (m1_res_fifo_flush           ),
          .wr_en                         (m1_res_fifo_wr              ),
          .wr_data                       (m1_res_fifo_wdata           ),
@@ -390,10 +460,10 @@ spim_if #( .WB_WIDTH(WB_WIDTH)) u_wb_if(
    );
 
 
-    spim_ctrl u_spictrl
+qspim_ctrl u_spictrl
     (
         .clk                            (mclk                         ),
-        .rstn                           (rst_n                        ),
+        .rstn                           (rst_ss_n                     ),
 
         .spi_clk_div                    (spi_clk_div                  ),
         .spi_status                     (spi_ctrl_status              ),
@@ -431,21 +501,21 @@ spim_if #( .WB_WIDTH(WB_WIDTH)) u_wb_if(
 
 	.ctrl_state                     (ctrl_state                   ),
 
-        .spi_clk                        (spi_clk                      ),
+        .spi_clk                        (spi_clk_int                  ),
         .spi_csn0                       (spi_csn0                     ),
         .spi_csn1                       (spi_csn1                     ),
         .spi_csn2                       (spi_csn2                     ),
         .spi_csn3                       (spi_csn3                     ),
         .spi_mode                       (spi_mode                     ),
-        .spi_sdo0                       (spi_sdo0                     ),
-        .spi_sdo1                       (spi_sdo1                     ),
-        .spi_sdo2                       (spi_sdo2                     ),
-        .spi_sdo3                       (spi_sdo3                     ),
-        .spi_sdi0                       (spi_sdi0                     ),
-        .spi_sdi1                       (spi_sdi1                     ),
-        .spi_sdi2                       (spi_sdi2                     ),
-        .spi_sdi3                       (spi_sdi3                     ),
-	.spi_en_tx_out                      (spi_en_tx                    )
+        .spi_sdo0                       (spi_sdo_int[0]               ),
+        .spi_sdo1                       (spi_sdo_int[1]               ),
+        .spi_sdo2                       (spi_sdo_int[2]               ),
+        .spi_sdo3                       (spi_sdo_int[3]               ),
+        .spi_sdi0                       (spi_sdi[0]                   ),
+        .spi_sdi1                       (spi_sdi[1]                   ),
+        .spi_sdi2                       (spi_sdi[2]                   ),
+        .spi_sdi3                       (spi_sdi[3]                   ),
+	.spi_en_tx_out                  (spi_en_tx                    )
     );
 
 endmodule

@@ -68,7 +68,7 @@
 ////                                                              ////
 //////////////////////////////////////////////////////////////////////
 
-module spim_tx
+module qspim_tx
 (
     // General Input
     input  logic        clk,            // SPI clock

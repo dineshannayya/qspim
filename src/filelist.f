@@ -16,9 +16,9 @@
 // SPDX-FileContributor: Dinesh Annayya <dinesha@opencores.org>
 // //////////////////////////////////////////////////////////////////////////
 
-spim_top.sv
-spim_regs.sv
-spim_clkgen.sv
-spim_ctrl.sv
-spim_rx.sv
-spim_tx.sv
+qspim_top.sv
+qspim_regs.sv
+qspim_clkgen.sv
+qspim_ctrl.sv
+qspim_rx.sv
+qspim_tx.sv

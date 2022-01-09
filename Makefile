@@ -16,37 +16,33 @@
 # // SPDX-FileContributor: Dinesh Annayya <dinesha@opencores.org>
 # // //////////////////////////////////////////////////////////////////////////
 #------------------------------------------------------------------------------
-# Makefile for Synthesis
+# Makefile for Simulation and Synthesis
 #------------------------------------------------------------------------------
 
 # Paths
 export ROOT_DIR := $(shell pwd)
-export REPORT_DIR  := $(ROOT_DIR)/reports
-export NETLIST_DIR  := $(ROOT_DIR)/netlist
-export TMP_DIR  := $(ROOT_DIR)/tmp
 
 
 # Targets
-.PHONY: clean create synth
+.PHONY: clean rtl gate synth help
 
-default: clean create synth
+default: clean rtl
 
-synth: clean create 
-	yosys -g -c synth.tcl -l synth.log
+rtl: 
+	cd tb && $(MAKE) rtl
 
-create:
-	mkdir -p ./tmp/synthesis; 
-	mkdir -p ./reports; 
-	mkdir -p ./netlist;
-	$(OPENLANE_ROOT)/scripts/libtrim.pl $(PDK_ROOT)/sky130A/libs.ref/sky130_fd_sc_hd/lib/sky130_fd_sc_hd__tt_025C_1v80.lib $(PDK_ROOT)/sky130A/libs.tech/openlane/sky130_fd_sc_hd/no_synth.cells > ./tmp/trimmed.lib
-	#create No PG Pin library for hand instantiated cells
-	sed '/pg_pin.*/a \         direction : "inout";'  $(PDK_ROOT)/sky130A/libs.ref/sky130_fd_sc_hd/lib/sky130_fd_sc_hd__tt_025C_1v80.lib  > ./tmp/sky130_fd_sc_hd__tt_025C_1v80.no_pg.lib
-	sed -i 's/pg_pin/pin/' ./tmp/sky130_fd_sc_hd__tt_025C_1v80.no_pg.lib
+gate: synth
+	cd tb && $(MAKE) gate
+
+synth:
+	cd ./synth && $(MAKE) synth
+
+help:
+	@echo "To run RTL  simulation: make rtl"
+	@echo "To run Gate simulation: make gate"
+	@echo "To run synthesis: make synth"
 
 
 
 clean:
-	$(RM) -R synth.log
-	$(RM) -R $(REPORT_DIR)
-	$(RM) -R $(NETLIST_DIR)
-	$(RM) -R $(TMP_DIR)
+	cd tb && $(MAKE) clean && cd ../synth && $(MAKE) clean 

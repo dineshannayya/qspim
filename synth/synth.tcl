@@ -17,32 +17,39 @@
 # // //////////////////////////////////////////////////////////////////////////
 # inputs expected as env vars
 #set opt $::env(SYNTH_OPT)
+
+proc convert_pg_pins {lib_in lib_out} {
+	try_catch sed -E {s/^([[:space:]]+)pg_pin(.*)/\1pin\2\n\1    direction : "inout";/g} $lib_in > $lib_out
+}
+
+
+
 ########### config.tcl ##################
 # User config
-
-# User config
-set ::env(DESIGN_DIR) ../
-
-set ::env(PROJ_DIR) ../../../../
-
-# User config
-set ::env(DESIGN_NAME) spim_ctrl
+set ::env(DESIGN_NAME) qspim_top
 
 # Change if needed
-set ::env(VERILOG_FILES) [glob  \
-	../src/spim_clkgen.sv   \
-        ../src/spim_ctrl.sv    \
-	../src/spim_fifo.sv    \
-	../src/spim_regs.sv    \
-	../src/spim_rx.sv    \
-	../src/spim_top.sv    \
-	../src/spim_tx.sv ]
+set ::env(VERILOG_FILES) [glob    \
+	../src/qspim_if.sv        \
+	../src/qspim_clkgen.sv    \
+        ../src/qspim_ctrl.sv      \
+	../src/qspim_fifo.sv      \
+	../src/qspim_regs.sv      \
+	../src/qspim_rx.sv        \
+	../src/qspim_top.sv       \
+	../src/qspim_tx.sv        \
+        ../lib/clk_skew_adjust.gv \
+        ../lib/ctech_cells.sv     \
+        ../lib/reset_sync.sv      \
+	]
 
 
-set ::env(SYNTH_DEFINES) [list YOSYS ]
+set ::env(SYNTH_DEFINES) [list SYNTHESIS ]
 
 
 set ::env(LIB_SYNTH)  ./tmp/trimmed.lib
+set ::env(LIB_SYNTH_COMPLETE_NO_PG) ./tmp/sky130_fd_sc_hd__tt_025C_1v80.no_pg.lib
+
 
 
 # Fill this
@@ -50,7 +57,6 @@ set ::env(CLOCK_PERIOD) "10"
 set ::env(CLOCK_PORT) "mclk"
 set ::env(CLOCK_TREE_SYNTH) 0
 
-set ::env(RUN_SIMPLE_CTS) 0
 set ::env(SYNTH_BUFFERING) 0
 set ::env(SYNTH_SIZING) 0
 
@@ -65,6 +71,7 @@ set ::env(CELL_PAD) 4
 
 set ::env(SYNTH_NO_FLAT) "0"
 
+set ::env(SYNTH_READ_BLACKBOX_LIB) "1"
 
 set ::env(SYNTH_STRATEGY) "AREA 0"
 set ::env(SYNTH_TIELO_PORT) "sky130_fd_sc_hd__conb_1 LO"
@@ -112,6 +119,10 @@ if {[info exist ::env(VERILOG_INCLUDE_DIRS)]} {
 	set vIdirsArgs [join $vIdirsArgs]
 }
 
+if { $::env(SYNTH_READ_BLACKBOX_LIB) } {
+	log "Reading $::env(LIB_SYNTH_COMPLETE_NO_PG) as a blackbox"
+	read_liberty -lib -ignore_miss_dir -setattr blackbox $::env(LIB_SYNTH_COMPLETE_NO_PG)
+}
 
 
 if { [info exists ::env(EXTRA_LIBS) ] } {

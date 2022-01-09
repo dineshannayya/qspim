@@ -59,7 +59,7 @@ later version.
 //-----------------------------------------------
 //`timescale  1ns/1ps
 
-module sync_fifo2 (clk,
+module qspim_fifo (clk,
                    reset_n,
 		   flush,
                    wr_en,
@@ -145,9 +145,9 @@ module sync_fifo2 (clk,
     assign afull = afull_c;
 
     always @(posedge clk) begin
-	if (wr_en) begin
-		mem[wr_ptr[AW-1:0]] <= wr_data;
-	end
+        if (wr_en) begin
+           mem[wr_ptr[AW-1:0]] <= wr_data;
+        end
     end
 
 

@@ -63,7 +63,7 @@
 //////////////////////////////////////////////////////////////////////
 
 
-module spim_rx #(
+module qspim_rx #(
 		parameter ENDIEAN = 0  // 0 - Little, 1 - Big endian, since RISV is Little indian default set 0
 	)	
 (
