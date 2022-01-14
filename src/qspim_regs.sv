@@ -81,8 +81,17 @@ module qspim_regs #( parameter WB_WIDTH = 32, parameter CMD_FIFO_WD = 36) (
     input logic                    [31:0] spi_debug       ,
 
     // Master 0 Configuration
+    // Direct Memory CS# Address Mapping
+    output logic  [7:0]                  cfg_m0_cs0_addr,
+    output logic  [7:0]                  cfg_m0_cs1_addr,
+    output logic  [7:0]                  cfg_m0_cs2_addr,
+    output logic  [7:0]                  cfg_m0_cs3_addr,
+    output logic  [7:0]                  cfg_m0_cs0_amask,
+    output logic  [7:0]                  cfg_m0_cs1_amask,
+    output logic  [7:0]                  cfg_m0_cs2_amask,
+    output logic  [7:0]                  cfg_m0_cs3_amask,
+
     output logic                         cfg_m0_fsm_reset ,
-    output logic [3:0]                   cfg_m0_cs_reg    ,  // Chip select
     output logic [1:0]                   cfg_m0_spi_mode  ,  // Final SPI Mode 
     output logic [1:0]                   cfg_m0_spi_switch,  // SPI Mode Switching Place
     output logic [3:0]                   cfg_m0_spi_seq   ,  // SPI SEQUENCE
@@ -159,12 +168,14 @@ parameter FSM_ACK_PHASE   = 3'b110;
 parameter GLBL_CTRL    = 4'b0000;
 parameter DMEM_CTRL1   = 4'b0001;
 parameter DMEM_CTRL2   = 4'b0010;
-parameter IMEM_CTRL1   = 4'b0011;
-parameter IMEM_CTRL2   = 4'b0100;
-parameter IMEM_ADDR    = 4'b0101;
-parameter IMEM_WDATA   = 4'b0110;
-parameter IMEM_RDATA   = 4'b0111;
-parameter SPI_STATUS   = 4'b1000;
+parameter DMEM_CS_AMAP = 4'b0011;  // DIRECT MEMORY CS# ADDRESS MAP
+parameter DMEM_CS_AMASK= 4'b0100;  // DIRECT MEMORY CS# ADDRESS MASK
+parameter IMEM_CTRL1   = 4'b0101;
+parameter IMEM_CTRL2   = 4'b0110;
+parameter IMEM_ADDR    = 4'b0111;
+parameter IMEM_WDATA   = 4'b1000;
+parameter IMEM_RDATA   = 4'b1001;
+parameter SPI_STATUS   = 4'b1010;
 
 // Init FSM
 parameter SPI_INIT_PWUP      = 3'b000;
@@ -294,6 +305,7 @@ logic                 spim_fifo_rdata_req  ;
 logic                 spim_fifo_wdata_req  ;
 
 
+
 //----------------------------------------------
 // Consolidated Register Ack handling
 //   1. Handles Normal Register Read
@@ -346,7 +358,6 @@ end
   always_ff @(negedge rst_n or posedge mclk) begin
     if ( rst_n == 1'b0 ) begin
       cfg_m0_fsm_reset      <= 'h0;
-      cfg_m0_cs_reg         <= P_CS0;
       cfg_m0_spi_mode       <= P_QUAD;
       cfg_m0_spi_switch     <= P_MODE_SWITCH_AT_ADDR;
       cfg_m0_cmd_reg        <= P_QIOR;
@@ -378,6 +389,20 @@ end
       spi_delay_cnt         <= 'h0;
       spim_reg_req_f        <= 1'b0;
       spi_init_state        <=  SPI_INIT_PWUP;
+
+      // Assumed Default Direct Address CS Mapping 
+      // 0x000_0000 to 0x0FF_FFFF - CS-0 (16MB)
+      // 0x100_0000 to 0x1FF_FFFF - CS-1 (16MB)
+      // 0x200_0000 to 0x2FF_FFFF - CS-2 (16MB)
+      // 0x300_0000 to 0x3FF_FFFF - CS-3 (16MB)
+      cfg_m0_cs0_addr        <= 8'h00;
+      cfg_m0_cs1_addr        <= 8'h10;
+      cfg_m0_cs2_addr        <= 8'h20;
+      cfg_m0_cs3_addr        <= 8'h30;
+      cfg_m0_cs0_amask       <= 8'hF0;
+      cfg_m0_cs1_amask       <= 8'hF0;
+      cfg_m0_cs2_amask       <= 8'hF0;
+      cfg_m0_cs3_amask       <= 8'hF0;
     end else begin 
         spim_reg_req_f        <= spim_reg_req; // Needed for finding Req Edge
         if (spi_init_done == 0) begin
@@ -491,7 +516,6 @@ end
          end
         DMEM_CTRL1: begin // This register control Direct Memory Access Type
              if ( spim_reg_be[0] == 1 ) begin
-               cfg_m0_cs_reg    <= spim_reg_wdata[3:0]; // Chip Select for Memory Interface
                cfg_m0_spi_mode  <= spim_reg_wdata[5:4]; // SPI Mode, 0 - Normal, 1- Double, 2 - Qard, 3 - QDDR
                cfg_m0_spi_switch<= spim_reg_wdata[7:6]; // Phase where to switch the SPI Mode
              end
@@ -515,6 +539,34 @@ end
                cfg_m0_data_cnt[7:0]  <= spim_reg_wdata[31:24];
              end
          end
+	 DMEM_CS_AMAP: begin
+             if ( spim_reg_be[0] == 1 ) begin
+                cfg_m0_cs0_addr    <= spim_reg_wdata[7:0];
+	     end
+             if ( spim_reg_be[1] == 1 ) begin
+                cfg_m0_cs1_addr    <= spim_reg_wdata[15:8];
+	     end
+             if ( spim_reg_be[2] == 1 ) begin
+                cfg_m0_cs2_addr    <= spim_reg_wdata[23:16];
+	     end
+             if ( spim_reg_be[3] == 1 ) begin
+                cfg_m0_cs3_addr    <= spim_reg_wdata[31:24];
+	     end
+	 end
+	 DMEM_CS_AMAP: begin
+             if ( spim_reg_be[0] == 1 ) begin
+                cfg_m0_cs0_amask    <= spim_reg_wdata[7:0];
+	     end
+             if ( spim_reg_be[1] == 1 ) begin
+                cfg_m0_cs1_amask    <= spim_reg_wdata[15:8];
+	     end
+             if ( spim_reg_be[2] == 1 ) begin
+                cfg_m0_cs2_amask    <= spim_reg_wdata[23:16];
+	     end
+             if ( spim_reg_be[3] == 1 ) begin
+                cfg_m0_cs3_amask    <= spim_reg_wdata[31:24];
+	     end
+	 end
          IMEM_CTRL1: begin
              if ( spim_reg_be[0] == 1 ) begin
                cfg_m1_cs_reg    <= spim_reg_wdata[3:0]; // Chip Select for Memory Interface
@@ -559,9 +611,12 @@ end
       reg_rdata = '0;
       if(spim_reg_req) begin
           case(spim_reg_addr)
-            GLBL_CTRL:   reg_rdata[31:0] = {16'h0,spi_clk_div,4'h0,cfg_cs_late,cfg_cs_early};
-	    DMEM_CTRL1:    reg_rdata[31:0] =  {16'h0,cfg_m0_fsm_reset,3'b0,cfg_m0_dummy_cnt,cfg_m0_spi_switch,cfg_m0_spi_mode,cfg_m0_cs_reg};
-	    DMEM_CTRL2:    reg_rdata[31:0] =  {cfg_m0_data_cnt,2'b0,cfg_m0_addr_cnt,cfg_m0_spi_seq,cfg_m0_mode_reg,cfg_m0_cmd_reg};
+            GLBL_CTRL:     reg_rdata[31:0] = {16'h0,spi_clk_div,4'h0,cfg_cs_late,cfg_cs_early};
+	    DMEM_CTRL1:    reg_rdata[31:0] = {16'h0,cfg_m0_fsm_reset,3'b0,cfg_m0_dummy_cnt,cfg_m0_spi_switch,cfg_m0_spi_mode,4'b0};
+	    DMEM_CTRL2:    reg_rdata[31:0] = {cfg_m0_data_cnt,2'b0,cfg_m0_addr_cnt,cfg_m0_spi_seq,cfg_m0_mode_reg,cfg_m0_cmd_reg};
+	    DMEM_CS_AMAP:  reg_rdata[31:0] = {cfg_m0_cs3_addr,cfg_m0_cs2_addr,cfg_m0_cs1_addr,cfg_m0_cs0_addr};
+	    DMEM_CS_AMASK: reg_rdata[31:0] = {cfg_m0_cs3_amask,cfg_m0_cs2_amask,cfg_m0_cs1_amask,cfg_m0_cs0_amask};
+
             IMEM_CTRL1:    reg_rdata[31:0] =  {16'h0, cfg_m1_fsm_reset,3'b0,cfg_m1_dummy_cnt,cfg_m1_spi_switch,cfg_m1_spi_mode,cfg_m1_cs_reg};
 	    IMEM_CTRL2:    reg_rdata[31:0] =  {cfg_m1_data_cnt,2'b00,cfg_m1_addr_cnt,cfg_m1_spi_seq,cfg_m1_mode_reg,cfg_m1_cmd_reg};
             IMEM_ADDR:   reg_rdata[31:0] = cfg_m1_addr;

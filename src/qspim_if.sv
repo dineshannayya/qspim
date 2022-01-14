@@ -84,6 +84,16 @@ module qspim_if #( parameter WB_WIDTH = 32,parameter CMD_FIFO_WD=36) (
 
 
     // Configuration
+    // Direct Memory CS# Address Mapping
+    input logic  [7:0]                   cfg_m0_cs0_addr,
+    input logic  [7:0]                   cfg_m0_cs1_addr,
+    input logic  [7:0]                   cfg_m0_cs2_addr,
+    input logic  [7:0]                   cfg_m0_cs3_addr,
+    input logic  [7:0]                   cfg_m0_cs0_amask,
+    input logic  [7:0]                   cfg_m0_cs1_amask,
+    input logic  [7:0]                   cfg_m0_cs2_amask,
+    input logic  [7:0]                   cfg_m0_cs3_amask,
+
     input logic                          cfg_fsm_reset,
     input logic [3:0]                    cfg_mem_seq,    // SPI MEM SEQUENCE
     input logic [1:0]                    cfg_addr_cnt,   // SPI Addr Count
@@ -92,6 +102,8 @@ module qspim_if #( parameter WB_WIDTH = 32,parameter CMD_FIFO_WD=36) (
     input logic [7:0]                    cfg_cmd_reg,    // SPI MEM COMMAND
     input logic [7:0]                    cfg_mode_reg,   // SPI MODE REG
     input logic                          spi_init_done,  // SPI internal Init completed
+
+    output logic [3:0]                   m0_cs_reg,
 
     // Towards Reg I/F
     output logic                         spim_reg_req,     // Reg Request
@@ -245,6 +257,21 @@ always_ff @(negedge rst_n or posedge mclk) begin
    end
 end
 
+
+// Generate CS# based on the Direct Address Map [27:20]
+//
+always_ff @(negedge rst_n or posedge mclk) begin
+    if ( rst_n == 1'b0 ) begin
+	m0_cs_reg <= 4'b0;
+    end else begin
+	if(spim_mem_req) begin
+           m0_cs_reg[0] <=  ((spim_wb_addr[27:20] & cfg_m0_cs0_amask) == cfg_m0_cs0_addr) ;
+           m0_cs_reg[1] <=  ((spim_wb_addr[27:20] & cfg_m0_cs1_amask) == cfg_m0_cs1_addr) ;
+           m0_cs_reg[2] <=  ((spim_wb_addr[27:20] & cfg_m0_cs2_amask) == cfg_m0_cs2_addr) ;
+           m0_cs_reg[3] <=  ((spim_wb_addr[27:20] & cfg_m0_cs3_amask) == cfg_m0_cs3_addr) ;
+	end
+    end
+end
 
 always_ff @(negedge rst_n or posedge mclk) begin
     if ( rst_n == 1'b0 ) begin

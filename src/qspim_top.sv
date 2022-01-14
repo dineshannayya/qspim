@@ -73,7 +73,9 @@
 ////     V.6  -  Jan 13, 2022                                     ////
 ////             All CS# brougt out from block                    ////
 ////     V.7  -  Jan 14, 2022                                     ////
-////             Changed Dummy to 2 to 4 bit                     ////
+////             1. Changed Dummy to 2 to 4 bit                   ////
+////             2. CS Address Map and Mask Reg added for Direct  ////
+////                access mode                                   ////
 ////                                                              ////
 //////////////////////////////////////////////////////////////////////
 ////                                                              ////
@@ -144,8 +146,17 @@ module qspim_top
     logic                   [7:0] spi_clk_div      ;
 
     // Master 0 Configuration
+    // Direct Memory CS# Address Mapping
+    logic  [7:0]                  cfg_m0_cs0_addr;
+    logic  [7:0]                  cfg_m0_cs1_addr;
+    logic  [7:0]                  cfg_m0_cs2_addr;
+    logic  [7:0]                  cfg_m0_cs3_addr;
+    logic  [7:0]                  cfg_m0_cs0_amask;
+    logic  [7:0]                  cfg_m0_cs1_amask;
+    logic  [7:0]                  cfg_m0_cs2_amask;
+    logic  [7:0]                  cfg_m0_cs3_amask;
     logic                         cfg_m0_fsm_reset ;
-    logic [3:0]                   cfg_m0_cs_reg    ;  // Chip select
+    logic [3:0]                       m0_cs_reg    ;  // Chip select
     logic [1:0]                   cfg_m0_spi_mode  ;  // Final SPI Mode 
     logic [1:0]                   cfg_m0_spi_switch;  // SPI Mode Switching Place
     logic [3:0]                   cfg_m0_spi_seq   ;  // SPI SEQUENCE
@@ -310,6 +321,15 @@ qspim_if #( .WB_WIDTH(WB_WIDTH),.CMD_FIFO_WD(CMD_FIFO_WD)) u_wb_if(
         .wbd_err_o                      (wbd_err_o                    ),  // error
 
     // Configuration
+	.cfg_m0_cs0_addr                (cfg_m0_cs0_addr              ),
+	.cfg_m0_cs1_addr                (cfg_m0_cs1_addr              ),
+	.cfg_m0_cs2_addr                (cfg_m0_cs2_addr              ),
+	.cfg_m0_cs3_addr                (cfg_m0_cs3_addr              ),
+
+	.cfg_m0_cs0_amask               (cfg_m0_cs0_amask             ),
+	.cfg_m0_cs1_amask               (cfg_m0_cs1_amask             ),
+	.cfg_m0_cs2_amask               (cfg_m0_cs2_amask             ),
+	.cfg_m0_cs3_amask               (cfg_m0_cs3_amask             ),
         .cfg_fsm_reset                  (cfg_m0_fsm_reset             ),
         .cfg_mem_seq                    (cfg_m0_spi_seq               ), // SPI MEM SEQUENCE
         .cfg_addr_cnt                   (cfg_m0_addr_cnt              ), // SPI Addr Count
@@ -317,6 +337,8 @@ qspim_if #( .WB_WIDTH(WB_WIDTH),.CMD_FIFO_WD(CMD_FIFO_WD)) u_wb_if(
         .cfg_data_cnt                   (cfg_m0_data_cnt              ), // SPI Read Count
         .cfg_cmd_reg                    (cfg_m0_cmd_reg               ), // SPI MEM COMMAND
         .cfg_mode_reg                   (cfg_m0_mode_reg              ), // SPI MODE REG
+
+	.m0_cs_reg                      (m0_cs_reg                    ),
 
         .spi_init_done                  (spi_init_done                ), // SPI internal Init completed
 
@@ -357,8 +379,18 @@ qspim_regs
 
         .spi_debug                      (spi_debug                    ),
 
+
+	.cfg_m0_cs0_addr                (cfg_m0_cs0_addr              ),
+	.cfg_m0_cs1_addr                (cfg_m0_cs1_addr              ),
+	.cfg_m0_cs2_addr                (cfg_m0_cs2_addr              ),
+	.cfg_m0_cs3_addr                (cfg_m0_cs3_addr              ),
+
+	.cfg_m0_cs0_amask               (cfg_m0_cs0_amask             ),
+	.cfg_m0_cs1_amask               (cfg_m0_cs1_amask             ),
+	.cfg_m0_cs2_amask               (cfg_m0_cs2_amask             ),
+	.cfg_m0_cs3_amask               (cfg_m0_cs3_amask             ),
+
         .cfg_m0_fsm_reset               (cfg_m0_fsm_reset             ),
-        .cfg_m0_cs_reg                  (cfg_m0_cs_reg                ), // Chip select
         .cfg_m0_spi_mode                (cfg_m0_spi_mode              ), // Final SPI Mode 
         .cfg_m0_spi_switch              (cfg_m0_spi_switch            ), // SPI Mode Switching Place
         .cfg_m0_spi_seq                 (cfg_m0_spi_seq               ), // SPI SEQUENCE
@@ -468,7 +500,7 @@ qspim_ctrl #(.CMD_FIFO_WD(CMD_FIFO_WD)) u_spictrl
         .spi_clk_div                    (spi_clk_div                  ),
         .spi_status                     (spi_ctrl_status              ),
 
-        .cfg_m0_cs_reg                  (cfg_m0_cs_reg                ), // Chip select
+        .cfg_m0_cs_reg                  (m0_cs_reg                    ), // Chip select
         .cfg_m0_spi_mode                (cfg_m0_spi_mode              ), // Final SPI Mode 
         .cfg_m0_spi_switch              (cfg_m0_spi_switch            ), // SPI Mode Switching Place
 
