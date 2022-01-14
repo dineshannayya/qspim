@@ -70,6 +70,10 @@
 ////             QDDR (0xED) supported is added                   ////
 ////     V.5  -  Nov 6, 2021                                      ////
 ////             Clock Skew Moves inside the block                ////
+////     V.6  -  Jan 13, 2022                                     ////
+////             All CS# brougt out from block                    ////
+////     V.7  -  Jan 14, 2022                                     ////
+////             Changed Dummy to 2 to 4 bit                     ////
 ////                                                              ////
 //////////////////////////////////////////////////////////////////////
 ////                                                              ////
@@ -101,7 +105,8 @@
 
 
 module qspim_top
-#( parameter WB_WIDTH = 32)
+#( parameter WB_WIDTH = 32,
+   parameter CMD_FIFO_WD = 36)
 (
 `ifdef USE_POWER_PINS
          input logic            vccd1,    // User area 1 1.8V supply
@@ -129,7 +134,7 @@ module qspim_top
     // PAD I/f
     input logic [3:0]                    spi_sdi,
     output logic                         spi_clk,
-    output logic                         spi_csn0,// No hold fix for CS#, as it asserted much eariler than SPI clock
+    output logic [3:0]                   spi_csn,// No hold fix for CS#, as it asserted much eariler than SPI clock
     output logic [3:0]                   spi_sdo,
     output logic [3:0]                   spi_oen
 );
@@ -145,7 +150,7 @@ module qspim_top
     logic [1:0]                   cfg_m0_spi_switch;  // SPI Mode Switching Place
     logic [3:0]                   cfg_m0_spi_seq   ;  // SPI SEQUENCE
     logic [1:0]                   cfg_m0_addr_cnt  ;  // SPI Addr Count
-    logic [1:0]                   cfg_m0_dummy_cnt ;  // SPI Dummy Count
+    logic [3:0]                   cfg_m0_dummy_cnt ;  // SPI Dummy Count
     logic [7:0]                   cfg_m0_data_cnt  ;  // SPI Read Count
     logic [7:0]                   cfg_m0_cmd_reg   ;  // SPI MEM COMMAND
     logic [7:0]                   cfg_m0_mode_reg  ;  // SPI MODE REG
@@ -171,8 +176,8 @@ module qspim_top
     logic                         m0_cmd_fifo_empty   ;   // Command FIFO empty
     logic                         m0_cmd_fifo_wr      ;   // Command FIFO Write
     logic                         m0_cmd_fifo_rd      ;   // Command FIFO read
-    logic [33:0]                  m0_cmd_fifo_wdata   ;   // Command FIFO WData
-    logic [33:0]                  m0_cmd_fifo_rdata   ;   // Command FIFO RData
+    logic [CMD_FIFO_WD-1:0]       m0_cmd_fifo_wdata   ;   // Command FIFO WData
+    logic [CMD_FIFO_WD-1:0]       m0_cmd_fifo_rdata   ;   // Command FIFO RData
     
     // Towards m0 Response FIFO
     logic                         m0_res_fifo_full    ;   // Response FIFO Empty
@@ -187,8 +192,8 @@ module qspim_top
     logic                         m1_cmd_fifo_empty   ;   // Command FIFO empty
     logic                         m1_cmd_fifo_wr      ;   // Command FIFO Write
     logic                         m1_cmd_fifo_rd      ;   // Command FIFO Write
-    logic [33:0]                  m1_cmd_fifo_wdata   ;   // Command FIFO WData
-    logic [33:0]                  m1_cmd_fifo_rdata   ;   // Command FIFO RData
+    logic [CMD_FIFO_WD-1:0]       m1_cmd_fifo_wdata   ;   // Command FIFO WData
+    logic [CMD_FIFO_WD-1:0]       m1_cmd_fifo_rdata   ;   // Command FIFO RData
     
     // Towards m0 Response FIFO
     logic                         m1_res_fifo_full    ;   // Response FIFO Empty
@@ -219,9 +224,6 @@ module qspim_top
 // SPI Interface moved inside to support carvel IO pad 
 // -------------------------------------------------------
 
-logic                          spi_csn1;
-logic                          spi_csn2;
-logic                          spi_csn3;
 logic                    [1:0] spi_mode;
 logic                          spi_en_tx;
 logic                          spi_init_done;
@@ -294,7 +296,7 @@ reset_sync  u_app_rst (
 	      .arst_n     (rst_n       ), // active low async reset
               .srst_n     (rst_ss_n    )
           );
-qspim_if #( .WB_WIDTH(WB_WIDTH)) u_wb_if(
+qspim_if #( .WB_WIDTH(WB_WIDTH),.CMD_FIFO_WD(CMD_FIFO_WD)) u_wb_if(
         .mclk                           (mclk                         ),
         .rst_n                          (rst_ss_n                     ),
 
@@ -343,9 +345,7 @@ qspim_if #( .WB_WIDTH(WB_WIDTH)) u_wb_if(
 
 
 qspim_regs
-    #(
-        .WB_WIDTH(WB_WIDTH)
-    )
+    #( .WB_WIDTH(WB_WIDTH),.CMD_FIFO_WD(CMD_FIFO_WD))
     u_spim_regs
     (
         .mclk                           (mclk                         ),
@@ -401,7 +401,7 @@ qspim_regs
     );
 
  // Master 0 Command FIFO
-qspim_fifo #(.W(34), .DP(2)) u_m0_cmd_fifo (
+qspim_fifo #(.W(CMD_FIFO_WD), .DP(2)) u_m0_cmd_fifo (
 	 .clk                           (mclk                        ),
          .reset_n                       (rst_ss_n                    ),
 	 .flush                         (1'b0                        ),
@@ -431,7 +431,7 @@ qspim_fifo #(.W(32), .DP(8)) u_m0_res_fifo (
    );
 
  // Master 1 Command FIFO
-qspim_fifo #(.W(34), .DP(4)) u_m1_cmd_fifo (
+qspim_fifo #(.W(CMD_FIFO_WD), .DP(4)) u_m1_cmd_fifo (
 	 .clk                           (mclk                        ),
          .reset_n                       (rst_ss_n                    ),
 	 .flush                         (1'b0                        ),
@@ -460,7 +460,7 @@ qspim_fifo #(.W(32), .DP(8)) u_m1_res_fifo (
    );
 
 
-qspim_ctrl u_spictrl
+qspim_ctrl #(.CMD_FIFO_WD(CMD_FIFO_WD)) u_spictrl
     (
         .clk                            (mclk                         ),
         .rstn                           (rst_ss_n                     ),
@@ -502,10 +502,10 @@ qspim_ctrl u_spictrl
 	.ctrl_state                     (ctrl_state                   ),
 
         .spi_clk                        (spi_clk_int                  ),
-        .spi_csn0                       (spi_csn0                     ),
-        .spi_csn1                       (spi_csn1                     ),
-        .spi_csn2                       (spi_csn2                     ),
-        .spi_csn3                       (spi_csn3                     ),
+        .spi_csn0                       (spi_csn[0]                   ),
+        .spi_csn1                       (spi_csn[1]                   ),
+        .spi_csn2                       (spi_csn[2]                   ),
+        .spi_csn3                       (spi_csn[3]                   ),
         .spi_mode                       (spi_mode                     ),
         .spi_sdo0                       (spi_sdo_int[0]               ),
         .spi_sdo1                       (spi_sdo_int[1]               ),

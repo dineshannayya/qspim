@@ -81,6 +81,7 @@
 
 //`include "spiflash.v"
 `include "s25fl256s.sv"
+`include "cy15b104qs.v"
 `ifdef GL
      //`define USE_POWER_PINS
      `define UNIT_DELAY #0.1
@@ -175,7 +176,7 @@ parameter P_FSM_CR     = 4'b1011;  // COMMAND -> READ
 	reg [31:0] read_data;
 
         wire flash_clk;
-        wire flash_csb;
+        wire [3:0] spi_csb;
         wire [3:0] spi_sdo;
         wire [3:0] spi_oeb;
         wire [3:0] io_oeb;
@@ -203,7 +204,7 @@ parameter P_FSM_CR     = 4'b1011;  // COMMAND -> READ
 
 	`ifdef WFDUMP
 	   initial begin
-	   	$dumpfile("tb_top.vcd");
+	   	$dumpfile("simx.vcd");
 	   	$dumpvars(0, tb_top);
 
 	   end
@@ -218,10 +219,32 @@ parameter P_FSM_CR     = 4'b1011;  // COMMAND -> READ
 		wb_rst_i = 1'b0;	    	// Release reset
 
 	        repeat (200) @(posedge clock);
+		// Important: Config the FRAM to QURD MODE to make the SRAM
+		// RESET pin to behave like to data pin. Other wise
+		// Toggling on Reset pin afect the other memory trasaction
+		// in the bus
+		// Set QUAD bit CR2_NV[6]=1 
+		$display("#############################################");
+		$display("  CONFIG CS#2 FRAM to QURD MODE              ");
+		$display("#############################################");
+		wb_user_core_write(32'h1000000C,{16'h0,1'b0,3'b0,4'b0000,2'b00,2'b00,4'b0100});
+		// SEND WREN Command to enable write access 
+		// <COMMAND PHASE> ONLY
+		wb_user_core_write(32'h10000010,{8'h1,2'b00,2'b10,4'b0000,8'h00,8'h06});
+		wb_user_core_write(32'h10000018,32'h0);
+	
+	        // <WRAR:0x71> <Address:0x000003> <Data:0x40> to enable qurd mode
+		// Setting QPI  = CR2_NV[6];
+		wb_user_core_write(32'h10000010,{8'h1,2'b00,2'b10,4'b0111,8'h00,8'h71});
+		wb_user_core_write(32'h10000014,32'h00000003);
+		wb_user_core_write(32'h10000018,32'h40);
+
+	        repeat (2000) @(posedge clock);
+
 		$display("#############################################");
 		$display("  Read Identification (RDID:0x9F)            ");
 		$display("#############################################");
-		wb_user_core_write(32'h1000000C,{15'h0,1'b0,2'b00,2'b00,4'b0001});
+		wb_user_core_write(32'h1000000C,{16'h0,1'b0,3'b0,4'b0000,2'b00,2'b00,4'b0001});
 		wb_user_core_write(32'h10000010,{8'h4,2'b00,2'b00,4'b1011,8'h00,8'h9F});
 		wb_user_core_read_check(32'h1000001C,read_data,32'h00190201);
 		$display("#############################################");
@@ -231,8 +254,8 @@ parameter P_FSM_CR     = 4'b1011;  // COMMAND -> READ
 		$display("SEQ: Command -> Address -> Read Data        ");
 		$display("#############################################");
 		// QDDR Config
-		wb_user_core_write(32'h10000004,{24'h0,2'b01,2'b11,4'b0001});
-		wb_user_core_write(32'h10000008,{8'h04,2'b01,2'b10,4'h6,8'h00,8'hED});
+		wb_user_core_write(32'h10000004,{16'h0,1'b0,3'b0,4'b0100,2'b01,2'b11,4'b0001});
+		wb_user_core_write(32'h10000008,{8'h04,2'b00,2'b10,4'h6,8'h00,8'hED});
 		wb_user_core_read_check(32'h00000200,read_data,32'h00000093);
 		wb_user_core_read_check(32'h00000204,read_data,32'h00000113);
 		wb_user_core_read_check(32'h00000208,read_data,32'h00000193);
@@ -255,7 +278,7 @@ parameter P_FSM_CR     = 4'b1011;  // COMMAND -> READ
 		$display("Prefetch : 1DW, OPCODE:READ(0x3)            ");
 		$display("SEQ: Command -> Address -> Read Data        ");
 		$display("#############################################");
-		wb_user_core_write(32'h10000004,{24'h0,2'b00,2'b00,4'b0001});
+		wb_user_core_write(32'h10000004,{16'h0,1'b0,3'b0,4'b0000,2'b00,2'b00,4'b0001});
 		wb_user_core_write(32'h10000008,{8'h04,2'b00,2'b10,4'h3,8'h00,8'h03});
 		wb_user_core_read_check(32'h00000200,read_data,32'h00000093);
 		wb_user_core_read_check(32'h00000204,read_data,32'h00000113);
@@ -279,7 +302,7 @@ parameter P_FSM_CR     = 4'b1011;  // COMMAND -> READ
 		$display("Prefetch : 1DW, OPCODE:FASTREAD(0xB)        ");
 		$display("SEQ: Command -> Address -> Dummy -> Read Data");
 		$display("#############################################");
-		wb_user_core_write(32'h10000004,{24'h0,2'b00,2'b00,4'b0001});
+		wb_user_core_write(32'h10000004,{16'h0,1'b0,3'b0,4'b0000,2'b00,2'b00,4'b0001});
 		wb_user_core_write(32'h10000008,{8'h04,2'b00,2'b10,4'h4,8'h00,8'h0B});
 		wb_user_core_read_check(32'h00000200,read_data,32'h00000093);
 		wb_user_core_read_check(32'h00000204,read_data,32'h00000113);
@@ -304,7 +327,7 @@ parameter P_FSM_CR     = 4'b1011;  // COMMAND -> READ
 		$display("Prefetch : 1DW, OPCODE:DOR(0x3B)        ");
 		$display("SEQ: Command -> Address -> Dummy -> Read Data");
 		$display("#############################################");
-		wb_user_core_write(32'h10000004,{24'h0,2'b10,2'b01,4'b0001});
+		wb_user_core_write(32'h10000004,{16'h0,1'b0,3'b0,4'b0000,2'b10,2'b01,4'b0001});
 		wb_user_core_write(32'h10000008,{8'h04,2'b00,2'b10,4'h4,8'h00,8'h3B});
 		wb_user_core_read_check(32'h00000200,read_data,32'h00000093);
 		wb_user_core_read_check(32'h00000204,read_data,32'h00000113);
@@ -329,8 +352,8 @@ parameter P_FSM_CR     = 4'b1011;  // COMMAND -> READ
 		$display("Prefetch : 8DW, OPCODE:URAD READ(0xEB)      ");
 		$display("SEQ: Command -> Address -> Dummy -> Read Data");
 		$display("#############################################");
-		wb_user_core_write(32'h10000004,{24'h0,2'b01,2'b10,4'b0001});
-		wb_user_core_write(32'h10000008,{8'h20,2'b01,2'b10,4'h6,8'h00,8'hEB});
+		wb_user_core_write(32'h10000004,{16'h0,1'b0,3'b0,4'b0001,2'b01,2'b10,4'b0001});
+		wb_user_core_write(32'h10000008,{8'h20,2'b00,2'b10,4'h6,8'h00,8'hEB});
 		wb_user_core_read_check(32'h00000200,read_data,32'h00000093);
 		wb_user_core_read_check(32'h00000204,read_data,32'h00000113);
 		wb_user_core_read_check(32'h00000208,read_data,32'h00000193);
@@ -351,8 +374,8 @@ parameter P_FSM_CR     = 4'b1011;  // COMMAND -> READ
 		$display("#############################################");
 		$display("Testing Direct SPI Memory Read with Prefetch:3DW");
 		$display("#############################################");
-		wb_user_core_write(32'h10000004,{24'h0,2'b01,2'b10,4'b0001});
-		wb_user_core_write(32'h10000008,{8'hC,2'b01,2'b10,4'h6,8'h00,8'hEB});
+		wb_user_core_write(32'h10000004,{16'h0,1'b0,3'b0,4'b0001,2'b01,2'b10,4'b0001});
+		wb_user_core_write(32'h10000008,{8'hC,2'b00,2'b10,4'h6,8'h00,8'hEB});
 		wb_user_core_read_check(32'h00000200,read_data,32'h00000093);
 		wb_user_core_read_check(32'h00000204,read_data,32'h00000113);
 		wb_user_core_read_check(32'h00000208,read_data,32'h00000193);
@@ -373,8 +396,8 @@ parameter P_FSM_CR     = 4'b1011;  // COMMAND -> READ
 		$display("#############################################");
 		$display("Testing Direct SPI Memory Read with Prefetch:2DW");
 		$display("#############################################");
-		wb_user_core_write(32'h10000004,{24'h0,2'b01,2'b10,4'b0001});
-		wb_user_core_write(32'h10000008,{8'h8,2'b01,2'b10,4'h6,8'h00,8'hEB});
+		wb_user_core_write(32'h10000004,{16'h0,1'b0,3'b0,4'b0001,2'b01,2'b10,4'b0001});
+		wb_user_core_write(32'h10000008,{8'h8,2'b00,2'b10,4'h6,8'h00,8'hEB});
 		wb_user_core_read_check(32'h00000200,read_data,32'h00000093);
 		wb_user_core_read_check(32'h00000204,read_data,32'h00000113);
 		wb_user_core_read_check(32'h00000208,read_data,32'h00000193);
@@ -396,8 +419,8 @@ parameter P_FSM_CR     = 4'b1011;  // COMMAND -> READ
 		$display("#############################################");
 		$display("Testing Direct SPI Memory Read with Prefetch:1DW");
 		$display("#############################################");
-		wb_user_core_write(32'h10000004,{24'h0,2'b01,2'b10,4'b0001});
-		wb_user_core_write(32'h10000008,{8'h4,2'b01,2'b10,4'h6,8'h00,8'hEB});
+		wb_user_core_write(32'h10000004,{16'h0,1'b0,3'b0,4'b0001,2'b01,2'b10,4'b0001});
+		wb_user_core_write(32'h10000008,{8'h4,2'b00,2'b10,4'h6,8'h00,8'hEB});
 		wb_user_core_read_check(32'h00000200,read_data,32'h00000093);
 		wb_user_core_read_check(32'h00000204,read_data,32'h00000113);
 		wb_user_core_read_check(32'h00000208,read_data,32'h00000193);
@@ -418,8 +441,8 @@ parameter P_FSM_CR     = 4'b1011;  // COMMAND -> READ
 		$display("#############################################");
 		$display("Testing Direct SPI Memory Read with Prefetch:7DW");
 		$display("#############################################");
-		wb_user_core_write(32'h10000004,{24'h0,2'b01,2'b10,4'b0001});
-		wb_user_core_write(32'h10000008,{8'h1C,2'b01,2'b10,4'h6,8'h00,8'hEB});
+		wb_user_core_write(32'h10000004,{16'h0,1'b0,3'b0,4'b0001,2'b01,2'b10,4'b0001});
+		wb_user_core_write(32'h10000008,{8'h1C,2'b00,2'b10,4'h6,8'h00,8'hEB});
 		wb_user_core_read_check(32'h00000200,read_data,32'h00000093);
 		wb_user_core_read_check(32'h00000204,read_data,32'h00000113);
 		wb_user_core_read_check(32'h00000208,read_data,32'h00000193);
@@ -440,8 +463,8 @@ parameter P_FSM_CR     = 4'b1011;  // COMMAND -> READ
 		$display("#############################################");
 		$display("  Testing Single Word Indirect SPI Memory Read");
 		$display("#############################################");
-		wb_user_core_write(32'h1000000C,{15'h0,1'b0,2'b01,2'b10,4'b0001});
-		wb_user_core_write(32'h10000010,{8'h4,2'b01,2'b10,4'b0110,8'h00,8'hEB});
+		wb_user_core_write(32'h1000000C,{16'h0,1'b0,3'b0,4'b0001,2'b01,2'b10,4'b0001});
+		wb_user_core_write(32'h10000010,{8'h4,2'b00,2'b10,4'b0110,8'h00,8'hEB});
 		wb_user_core_write(32'h10000014,32'h00000200);
 		wb_user_core_read_check(32'h1000001C,read_data,32'h00000093);
 		wb_user_core_write(32'h10000014,32'h00000204);
@@ -478,8 +501,8 @@ parameter P_FSM_CR     = 4'b1011;  // COMMAND -> READ
 		$display("#############################################");
 		$display("  Testing Two Word Indirect SPI Memory Read");
 		$display("#############################################");
-		wb_user_core_write(32'h1000000C,{15'h0,1'b0,2'b01,2'b10,4'b0001});
-		wb_user_core_write(32'h10000010,{8'h8,2'b01,2'b10,4'b0110,8'h00,8'hEB});
+		wb_user_core_write(32'h1000000C,{16'h0,1'b0,3'b0,4'b0001,2'b01,2'b10,4'b0001});
+		wb_user_core_write(32'h10000010,{8'h8,2'b00,2'b10,4'b0110,8'h00,8'hEB});
 		wb_user_core_write(32'h10000014,32'h00000200);
 		wb_user_core_read_check(32'h1000001C,read_data,32'h00000093);
 		wb_user_core_read_check(32'h1000001C,read_data,32'h00000113);
@@ -508,8 +531,8 @@ parameter P_FSM_CR     = 4'b1011;  // COMMAND -> READ
 		$display("#############################################");
 		$display("  Testing Three Word Indirect SPI Memory Read");
 		$display("#############################################");
-		wb_user_core_write(32'h1000000C,{15'h0,1'b0,2'b01,2'b10,4'b0001});
-		wb_user_core_write(32'h10000010,{8'hC,2'b01,2'b10,4'b0110,8'h00,8'hEB});
+		wb_user_core_write(32'h1000000C,{16'h0,1'b0,3'b0,4'b0001,2'b01,2'b10,4'b0001});
+		wb_user_core_write(32'h10000010,{8'hC,2'b00,2'b10,4'b0110,8'h00,8'hEB});
 		wb_user_core_write(32'h10000014,32'h00000200);
 		wb_user_core_read_check(32'h1000001C,read_data,32'h00000093);
 		wb_user_core_read_check(32'h1000001C,read_data,32'h00000113);
@@ -530,8 +553,8 @@ parameter P_FSM_CR     = 4'b1011;  // COMMAND -> READ
 		$display("#############################################");
 		$display("  Testing Four Word Indirect SPI Memory Read");
 		$display("#############################################");
-		wb_user_core_write(32'h1000000C,{15'h0,1'b0,2'b01,2'b10,4'b0001});
-		wb_user_core_write(32'h10000010,{8'h10,2'b01,2'b10,4'b0110,8'h00,8'hEB});
+		wb_user_core_write(32'h1000000C,{16'h0,1'b0,3'b0,4'b0001,2'b01,2'b10,4'b0001});
+		wb_user_core_write(32'h10000010,{8'h10,2'b00,2'b10,4'b0110,8'h00,8'hEB});
 		wb_user_core_write(32'h10000014,32'h00000200);
 		wb_user_core_read_check(32'h1000001C,read_data,32'h00000093);
 		wb_user_core_read_check(32'h1000001C,read_data,32'h00000113);
@@ -556,8 +579,8 @@ parameter P_FSM_CR     = 4'b1011;  // COMMAND -> READ
 		$display("#############################################");
 		$display("  Testing Five Word Indirect SPI Memory Read");
 		$display("#############################################");
-		wb_user_core_write(32'h1000000C,{15'h0,1'b0,2'b01,2'b10,4'b0001});
-		wb_user_core_write(32'h10000010,{8'h14,2'b01,2'b10,4'b0110,8'h00,8'hEB});
+		wb_user_core_write(32'h1000000C,{16'h0,1'b0,3'b0,4'b0001,2'b01,2'b10,4'b0001});
+		wb_user_core_write(32'h10000010,{8'h14,2'b00,2'b10,4'b0110,8'h00,8'hEB});
 		wb_user_core_write(32'h10000014,32'h00000200);
 		wb_user_core_read_check(32'h1000001C,read_data,32'h00000093);
 		wb_user_core_read_check(32'h1000001C,read_data,32'h00000113);
@@ -573,8 +596,8 @@ parameter P_FSM_CR     = 4'b1011;  // COMMAND -> READ
 		$display("#############################################");
 		$display("  Testing Eight Word Indirect SPI Memory Read");
 		$display("#############################################");
-		wb_user_core_write(32'h1000000C,{15'h0,1'b0,2'b01,2'b10,4'b0001});
-		wb_user_core_write(32'h10000010,{8'h20,2'b01,2'b10,4'b0110,8'h00,8'hEB});
+		wb_user_core_write(32'h1000000C,{16'h0,1'b0,3'b0,4'b0001,2'b01,2'b10,4'b0001});
+		wb_user_core_write(32'h10000010,{8'h20,2'b00,2'b10,4'b0110,8'h00,8'hEB});
 		wb_user_core_write(32'h10000014,32'h00000200);
 		wb_user_core_read_check(32'h1000001C,read_data,32'h00000093);
 		wb_user_core_read_check(32'h1000001C,read_data,32'h00000113);
@@ -598,17 +621,17 @@ parameter P_FSM_CR     = 4'b1011;  // COMMAND -> READ
 		$display("  Sector Erase Command            ");
 		$display("#############################################");
 		// WEN COMMAND
-		wb_user_core_write(32'h1000000C,{15'h0,1'b0,2'b00,2'b00,4'b0001});
+		wb_user_core_write(32'h1000000C,{16'h0,1'b0,3'b0,4'b0000,2'b00,2'b00,4'b0001});
 		wb_user_core_write(32'h10000010,{8'h0,2'b00,2'b00,4'b0000,8'h00,8'h06});
 		wb_user_core_write(32'h10000018,32'h0);
                 // Sector Erase
-		wb_user_core_write(32'h1000000C,{15'h0,1'b0,2'b00,2'b00,4'b0001});
+		wb_user_core_write(32'h1000000C,{16'h0,1'b0,3'b0,4'b0000,2'b00,2'b00,4'b0001});
 		wb_user_core_write(32'h10000010,{8'h0,2'b00,2'b10,4'b0010,8'h00,8'hD8});
 		wb_user_core_write(32'h10000014,32'h00000000);
 		wb_user_core_write(32'h10000018,32'h0);
 
 		// RDSR
-		wb_user_core_write(32'h1000000C,{15'h0,1'b0,2'b00,2'b00,4'b0001});
+		wb_user_core_write(32'h1000000C,{16'h0,1'b0,3'b0,4'b0000,2'b00,2'b00,4'b0001});
 		wb_user_core_write(32'h10000010,{8'h4,2'b00,2'b00,4'b1011,8'h00,8'h05});
 		read_data = 32'hFFFF_FFFF;
 		while (read_data[1:0] == 2'b11) begin
@@ -620,11 +643,11 @@ parameter P_FSM_CR     = 4'b1011;  // COMMAND -> READ
 		$display("  Page Write Command Address: 0x00          ");
 		$display("#############################################");
 		// WEN COMMAND
-		wb_user_core_write(32'h1000000C,{15'h0,1'b0,2'b00,2'b00,4'b0001});
+		wb_user_core_write(32'h1000000C,{16'h0,1'b0,3'b0,4'b0000,2'b00,2'b00,4'b0001});
 		wb_user_core_write(32'h10000010,{8'h0,2'b00,2'b00,4'b0000,8'h00,8'h06});
 		wb_user_core_write(32'h10000018,32'h0);
 		 // Page Programing
-		wb_user_core_write(32'h1000000C,{15'h0,1'b0,2'b00,2'b00,4'b0001});
+		wb_user_core_write(32'h1000000C,{16'h0,1'b0,3'b0,4'b0000,2'b00,2'b00,4'b0001});
 		wb_user_core_write(32'h10000010,{8'hF0,2'b00,2'b10,P_FSM_CAW,8'h00,8'h02});
 		wb_user_core_write(32'h10000014,32'h00000000);
 		wb_user_core_write(32'h10000018,32'h00010000);
@@ -689,7 +712,7 @@ parameter P_FSM_CR     = 4'b1011;  // COMMAND -> READ
 		wb_user_core_write(32'h10000018,32'h00010059);
 
 		// RDSR
-		wb_user_core_write(32'h1000000C,{15'h0,1'b0,2'b00,2'b00,4'b0001});
+		wb_user_core_write(32'h1000000C,{16'h0,1'b0,3'b0,4'b0000,2'b00,2'b00,4'b0001});
 		wb_user_core_write(32'h10000010,{8'h4,2'b00,2'b00,4'b1011,8'h00,8'h05});
 		read_data = 32'hFFFF_FFFF;
 		while (read_data[1:0] == 2'b11) begin
@@ -766,8 +789,8 @@ parameter P_FSM_CR     = 4'b1011;  // COMMAND -> READ
 		$display("#############################################");
 		$display("  Page Read through Indirect Access           ");
 		$display("#############################################");
-		wb_user_core_write(32'h1000000C,{15'h0,1'b0,2'b01,2'b10,4'b0001});
-		wb_user_core_write(32'h10000010,{8'hF0,2'b01,2'b10,4'b0110,8'h00,8'hEB});
+		wb_user_core_write(32'h1000000C,{16'h0,1'b0,3'b0,4'b0001,2'b01,2'b10,4'b0001});
+		wb_user_core_write(32'h10000010,{8'hF0,2'b00,2'b10,4'b0110,8'h00,8'hEB});
 		wb_user_core_write(32'h10000014,32'h00000000);
 
 		wb_user_core_read_check(32'h1000001C,read_data,32'h00010000);
@@ -836,11 +859,11 @@ parameter P_FSM_CR     = 4'b1011;  // COMMAND -> READ
 		$display("  Page Write Command Address: 0x200          ");
 		$display("#############################################");
 		// WEN COMMAND
-		wb_user_core_write(32'h1000000C,{15'h0,1'b0,2'b00,2'b00,4'b0001});
+		wb_user_core_write(32'h1000000C,{16'h0,1'b0,3'b0,4'b0000,2'b00,2'b00,4'b0001});
 		wb_user_core_write(32'h10000010,{8'h0,2'b00,2'b00,4'b0000,8'h00,8'h06});
 		wb_user_core_write(32'h10000018,32'h0);
 		 // Page Programing
-		wb_user_core_write(32'h1000000C,{15'h0,1'b0,2'b00,2'b00,4'b0001});
+		wb_user_core_write(32'h1000000C,{16'h0,1'b0,3'b0,4'b0000,2'b00,2'b00,4'b0001});
 		wb_user_core_write(32'h10000010,{8'hF0,2'b00,2'b10,P_FSM_CAW,8'h00,8'h02});
 		wb_user_core_write(32'h10000014,32'h00000200);
 		wb_user_core_write(32'h10000018,32'h00020000);
@@ -905,7 +928,7 @@ parameter P_FSM_CR     = 4'b1011;  // COMMAND -> READ
 		wb_user_core_write(32'h10000018,32'h00020059);
 
 		// RDSR
-		wb_user_core_write(32'h1000000C,{15'h0,1'b0,2'b00,2'b00,4'b0001});
+		wb_user_core_write(32'h1000000C,{16'h0,1'b0,3'b0,4'b0000,2'b00,2'b00,4'b0001});
 		wb_user_core_write(32'h10000010,{8'h4,2'b00,2'b00,4'b1011,8'h00,8'h05});
 		read_data = 32'hFFFF_FFFF;
 		while (read_data[1:0] == 2'b11) begin
@@ -982,8 +1005,8 @@ parameter P_FSM_CR     = 4'b1011;  // COMMAND -> READ
 		$display("#############################################");
 		$display("  Page Read through Indirect Access           ");
 		$display("#############################################");
-		wb_user_core_write(32'h1000000C,{15'h0,1'b0,2'b01,2'b10,4'b0001});
-		wb_user_core_write(32'h10000010,{8'hF0,2'b01,2'b10,4'b0110,8'h00,8'hEB});
+		wb_user_core_write(32'h1000000C,{16'h0,1'b0,3'b0,4'b0001,2'b01,2'b10,4'b0001});
+		wb_user_core_write(32'h10000010,{8'hF0,2'b00,2'b10,4'b0110,8'h00,8'hEB});
 		wb_user_core_write(32'h10000014,32'h00000200);
 
 		wb_user_core_read_check(32'h1000001C,read_data,32'h00020000);
@@ -1097,7 +1120,7 @@ qspim_top u_top(
     // IOs
     .spi_sdi     (spi_sdi),
     .spi_clk     (flash_clk),
-    .spi_csn0    (flash_csb),
+    .spi_csn     (spi_csb),
     .spi_sdo     (spi_sdo),
     .spi_oen     (spi_oeb)
 
@@ -1149,12 +1172,27 @@ qspim_top u_top(
            .SO      (flash_io1),
            // Controls
            .SCK     (flash_clk),
-           .CSNeg   (flash_csb),
+           .CSNeg   (spi_csb[0]),
            .WPNeg   (flash_io2),
            .HOLDNeg (flash_io3),
            .RSTNeg  (!wb_rst_i)
        
        );
+
+   cy15b104qs #(.mem_file_name("none"),
+	         .otp_file_name("none"),
+		 .TimingModel("CY15B104QSN-108SXI"))
+	u_sfram (
+         // Data Inputs/Outputs
+           .SI      (flash_io0),
+           .SO      (flash_io1),
+           // Controls
+           .SCK     (flash_clk),
+           .CSNeg   (spi_csb[2]),
+           .WPNeg   (flash_io2),
+           .RESETNeg(flash_io3)
+    );
+
 
 
 

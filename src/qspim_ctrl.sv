@@ -61,6 +61,7 @@
 ////                                                              ////
 //////////////////////////////////////////////////////////////////////
 module qspim_ctrl  #(
+     parameter CMD_FIFO_WD=36,
      parameter ENDIEAN = 0  // 0 - Little, 1 - Big endian, since RISV is Little indian default set 0
      )
 
@@ -86,7 +87,7 @@ module qspim_ctrl  #(
     // Master 0 Command FIFO Interface
     input  logic                         m0_cmd_fifo_empty,
     output logic                         m0_cmd_fifo_rd,
-    input  logic [33:0]                  m0_cmd_fifo_rdata,
+    input  logic [CMD_FIFO_WD-1:0]       m0_cmd_fifo_rdata,
 
     // Master 0 response FIFO Interface
     output logic 	                 m0_res_fifo_flush,
@@ -99,7 +100,7 @@ module qspim_ctrl  #(
     output logic 	                 m1_res_fifo_flush,
     input  logic                         m1_cmd_fifo_empty,
     output logic                         m1_cmd_fifo_rd,
-    input  logic [33:0]                  m1_cmd_fifo_rdata,
+    input  logic [CMD_FIFO_WD-1:0]       m1_cmd_fifo_rdata,
 
     // Master 1 response FIFO Interface
     input  logic                         m1_res_fifo_empty,
@@ -233,7 +234,7 @@ parameter P_FSM_CR     = 4'b1011;  // COMMAND -> READ
   logic [1:0]  gnt;
 
   logic  [7:0] cfg_data_cnt    ;
-  logic  [1:0] cfg_dummy_cnt   ;
+  logic  [3:0] cfg_dummy_cnt   ;
   logic  [1:0] cfg_addr_cnt    ;
   logic  [3:0] cfg_spi_seq     ;
   logic [7:0]  spi_mode_cmd    ;
@@ -264,9 +265,9 @@ parameter P_FSM_CR     = 4'b1011;  // COMMAND -> READ
   //----------------------------
   // Command FIFO
   //----------------------------
-  logic              cmd_fifo_empty;
-  logic              cmd_fifo_rd;
-  logic [33:0]       cmd_fifo_rdata;
+  logic                         cmd_fifo_empty;
+  logic                         cmd_fifo_rd;
+  logic [CMD_FIFO_WD-1:0]       cmd_fifo_rdata;
 
   assign cmd_fifo_empty = (gnt == 2'b01) ? m0_cmd_fifo_empty : m1_cmd_fifo_empty;
   assign cmd_fifo_rdata = (gnt == 2'b01) ? m0_cmd_fifo_rdata : m1_cmd_fifo_rdata;
@@ -506,16 +507,8 @@ parameter P_FSM_CR     = 4'b1011;  // COMMAND -> READ
           ctrl_data_mux    = DATA_EMPTY;
           ctrl_data_valid  = 1'b1;
           counter_tx_valid = 1'b1;
-	  if(s_spi_mode == P_QDDR ) begin
-	    // QDDR Mode, change the Dummy cycle values to 32,40,48,56
-            counter_tx       =  (cfg_dummy_cnt == 2'b00) ? 'd32 :
-	                        (cfg_dummy_cnt == 2'b01) ? 'd40 :
-	                        (cfg_dummy_cnt == 2'b10) ? 'd48 : 'd56;
-	  end else begin
-            counter_tx       =  (cfg_dummy_cnt == P_8BIT) ? 'd8 :
-	                        (cfg_dummy_cnt == P_16BIT) ? 'd16 :
-	                        (cfg_dummy_cnt == P_24BIT) ? 'd24 : 'd32;
-	  end
+	  // Convert into Bit format
+          counter_tx       =  'd8 + (cfg_dummy_cnt << 3); // Convert into Bit format
           spi_en_tx        = 1'b1;
 	  if (tx_data_ready) begin
               ctrl_data_valid = 1'b0;
@@ -651,16 +644,16 @@ end
     end else begin
        if(state == FSM_IDLE) begin
            if(!m0_cmd_fifo_empty) begin
-              cfg_data_cnt    <= m0_cmd_fifo_rdata[31:24];
-              cfg_dummy_cnt   <= m0_cmd_fifo_rdata[23:22];
+              cfg_data_cnt    <= m0_cmd_fifo_rdata[33:26];
+              cfg_dummy_cnt   <= m0_cmd_fifo_rdata[25:22];
               cfg_addr_cnt    <= m0_cmd_fifo_rdata[21:20];
               cfg_spi_seq     <= m0_cmd_fifo_rdata[19:16];
               spi_mode_cmd    <= m0_cmd_fifo_rdata[15:8];
               gnt             <= 2'b01;
            end
            else if(!m1_cmd_fifo_empty ) begin
-              cfg_data_cnt    <= m1_cmd_fifo_rdata[31:24];
-              cfg_dummy_cnt   <= m1_cmd_fifo_rdata[23:22];
+              cfg_data_cnt    <= m1_cmd_fifo_rdata[33:26];
+              cfg_dummy_cnt   <= m1_cmd_fifo_rdata[25:22];
               cfg_addr_cnt    <= m1_cmd_fifo_rdata[21:20];
               cfg_spi_seq     <= m1_cmd_fifo_rdata[19:16];
               spi_mode_cmd    <= m1_cmd_fifo_rdata[15:8];

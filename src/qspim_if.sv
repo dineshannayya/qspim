@@ -69,7 +69,7 @@
 //////////////////////////////////////////////////////////////////////
 
 
-module qspim_if #( parameter WB_WIDTH = 32) (
+module qspim_if #( parameter WB_WIDTH = 32,parameter CMD_FIFO_WD=36) (
     input  logic                         mclk,
     input  logic                         rst_n,
 
@@ -87,7 +87,7 @@ module qspim_if #( parameter WB_WIDTH = 32) (
     input logic                          cfg_fsm_reset,
     input logic [3:0]                    cfg_mem_seq,    // SPI MEM SEQUENCE
     input logic [1:0]                    cfg_addr_cnt,   // SPI Addr Count
-    input logic [1:0]                    cfg_dummy_cnt,  // SPI Dummy Count
+    input logic [3:0]                    cfg_dummy_cnt,  // SPI Dummy Count
     input logic [7:0]                    cfg_data_cnt,   // SPI Read Count
     input logic [7:0]                    cfg_cmd_reg,    // SPI MEM COMMAND
     input logic [7:0]                    cfg_mode_reg,   // SPI MODE REG
@@ -105,7 +105,7 @@ module qspim_if #( parameter WB_WIDTH = 32) (
     // Towards Command FIFO
     input  logic                         cmd_fifo_empty,   // Command FIFO empty
     output logic                         cmd_fifo_wr,      // Command FIFO Write
-    output logic [33:0]                  cmd_fifo_wdata,   // Command FIFO WData
+    output logic [CMD_FIFO_WD-1:0]       cmd_fifo_wdata,   // Command FIFO WData
     
     // Towards Response FIFO
     input  logic                         res_fifo_empty,   // Response FIFO Empty
@@ -276,13 +276,13 @@ begin
 	if(spim_mem_req && NextPreDVal && (spim_wb_addr == NextPreAddr)) begin
           next_state = READ_DATA;
 	end else if(spim_mem_req && cmd_fifo_empty) begin
-	   cmd_fifo_wdata = {SOC,NOC,cfg_data_cnt[7:0],cfg_dummy_cnt[1:0],cfg_addr_cnt[1:0],cfg_mem_seq[3:0],cfg_mode_reg[7:0],cfg_cmd_reg[7:0]};
+	   cmd_fifo_wdata = {SOC,NOC,cfg_data_cnt[7:0],cfg_dummy_cnt[3:0],cfg_addr_cnt[1:0],cfg_mem_seq[3:0],cfg_mode_reg[7:0],cfg_cmd_reg[7:0]};
 	   cmd_fifo_wr    = 1;
 	   next_state = ADR_PHASE;
 	end
    end
    ADR_PHASE: begin
-          cmd_fifo_wdata = {NOC,EOC,spim_wb_addr[31:0]};
+          cmd_fifo_wdata = {NOC,EOC,2'b0,spim_wb_addr[31:0]};
           cmd_fifo_wr      = 1;
           next_state = CMD_WAIT;
    end
