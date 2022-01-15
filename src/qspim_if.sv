@@ -115,6 +115,7 @@ module qspim_if #( parameter WB_WIDTH = 32,parameter CMD_FIFO_WD=36) (
     input  logic [31:0]                  spim_reg_rdata,    // Read Read Data
 
     // Towards Command FIFO
+    input  logic                         cmd_fifo_full,   // Command FIFO full
     input  logic                         cmd_fifo_empty,   // Command FIFO empty
     output logic                         cmd_fifo_wr,      // Command FIFO Write
     output logic [CMD_FIFO_WD-1:0]       cmd_fifo_wdata,   // Command FIFO WData
@@ -135,53 +136,13 @@ parameter EOC = 1'b1;    // END of COMMAND
 parameter NOC = 1'b0;    // NORMAL COMMAND
 
 // State Machine state
-parameter IDLE       = 4'b000;
-parameter ADR_PHASE  = 4'b001;
-parameter CMD_WAIT   = 4'b010;
-parameter READ_DATA  = 4'b011;
+parameter IDLE       = 4'b0000;
+parameter ADR_PHASE  = 4'b0001;
+parameter CMD_WAIT   = 4'b0010;
+parameter READ_DATA  = 4'b0011;
+parameter WRITE_DATA = 4'b0100;
 
-/*************************************************************
-*  SPI FSM State Control
-*
-*   OPERATION   COMMAND                   SEQUENCE 
-*
-*    ERASE       P4E(0x20)           ->  COMMAND + ADDRESS
-*    ERASE       P8E(0x40)           ->  COMMAND + ADDRESS
-*    ERASE       SE(0xD8)            ->  COMMAND + ADDRESS
-*    ERASE       BE(0x60)            ->  COMMAND + ADDRESS
-*    ERASE       BE(0xC7)            ->  COMMAND 
-*    PROGRAM     PP(0x02)            ->  COMMAND + ADDRESS + Write DATA
-*    PROGRAM     QPP(0x32)           ->  COMMAND + ADDRESS + Write DATA
-*    READ        READ(0x3)           ->  COMMAND + ADDRESS + READ DATA
-*    READ        FAST_READ(0xB)      ->  COMMAND + ADDRESS + DUMMY + READ DATA
-*    READ        DOR (0x3B)          ->  COMMAND + ADDRESS + DUMMY + READ DATA
-*    READ        QOR (0x6B)          ->  COMMAND + ADDRESS + DUMMY + READ DATA
-*    READ        DIOR (0xBB)         ->  COMMAND + ADDRESS + MODE  + READ DATA
-*    READ        QIOR (0xEB)         ->  COMMAND + ADDRESS + MODE  + DUMMY + READ DATA
-*    READ        RDID (0x9F)         ->  COMMAND + READ DATA
-*    READ        READ_ID (0x90)      ->  COMMAND + ADDRESS + READ DATA
-*    WRITE       WREN(0x6)           ->  COMMAND
-*    WRITE       WRDI                ->  COMMAND
-*    STATUS      RDSR(0x05)          ->  COMMAND + READ DATA
-*    STATUS      RCR(0x35)           ->  COMMAND + READ DATA
-*    CONFIG      WRR(0x01)           ->  COMMAND + WRITE DATA
-*    CONFIG      CLSR(0x30)          ->  COMMAND
-*    Power Saving DP(0xB9)           ->  COMMAND
-*    Power Saving RES(0xAB)          ->  COMMAND + READ DATA
-*    OTP          OTPP(0x42)         ->  COMMAND + ADDR+ WRITE DATA
-*    OTP          OTPR(0x4B)         ->  COMMAND + ADDR + DUMMY + READ DATA
-*    ********************************************************************/
 
-parameter P_FSM_C      = 4'b0000; // Command Phase Only
-parameter P_FSM_CA     = 4'b0001; // Command -> Address Phase Only
-
-parameter P_FSM_CAR    = 4'b0010; // Command -> Address -> Read Data
-parameter P_FSM_CADR   = 4'b0011; // Command -> Address -> Dummy -> Read Data
-parameter P_FSM_CAMR   = 4'b0100; // Command -> Address -> Mode -> Read Data
-parameter P_FSM_CAMDR  = 4'b0101; // Command -> Address -> Mode -> Dummy -> Read Data
-
-parameter P_FSM_CAW    = 4'b0110; // Command -> Address ->Write Data
-parameter P_FSM_CADW   = 4'b0111; // Command -> Address -> DUMMY + Write Data
 //---------------------------------------------------------
 // Variable declartion
 // -------------------------------------------------------
@@ -300,7 +261,7 @@ begin
 	// Check If any prefetch data available and if see it matched with WB
 	// address, If yes, the move to data reading from response fifo, else 
 	// generate command request
-	if(spim_mem_req && NextPreDVal && (spim_wb_addr == NextPreAddr)) begin
+	if(spim_mem_req && !wbd_we_i && NextPreDVal && (spim_wb_addr == NextPreAddr)) begin
           next_state = READ_DATA;
 	end else if(spim_mem_req && cmd_fifo_empty) begin
 	   cmd_fifo_wdata = {SOC,NOC,cfg_data_cnt[7:0],cfg_dummy_cnt[3:0],cfg_addr_cnt[1:0],cfg_mem_seq[3:0],cfg_mode_reg[7:0],cfg_cmd_reg[7:0]};
@@ -309,9 +270,14 @@ begin
 	end
    end
    ADR_PHASE: begin
-          cmd_fifo_wdata = {NOC,EOC,2'b0,spim_wb_addr[31:0]};
+	  if(spim_wb_we) begin
+              cmd_fifo_wdata = {NOC,NOC,2'b0,spim_wb_addr[31:0]};
+             next_state = WRITE_DATA;
+          end else begin
+              cmd_fifo_wdata = {NOC,EOC,2'b0,spim_wb_addr[31:0]};
+             next_state = CMD_WAIT;
+          end
           cmd_fifo_wr      = 1;
-          next_state = CMD_WAIT;
    end
    CMD_WAIT: begin
 	  // Wait for Command Accepted, before reading data
@@ -324,6 +290,14 @@ begin
 	if(res_fifo_empty != 1) begin
            spi_mem_rdata = res_fifo_rdata;
 	   res_fifo_rd   = 1;
+           spim_mem_ack  = 1;
+           next_state    = IDLE;
+	end
+   end
+   WRITE_DATA: begin
+	if(cmd_fifo_full != 1) begin
+           cmd_fifo_wdata = {NOC,EOC,2'b0,spim_wb_wdata[31:0]};
+           cmd_fifo_wr      = 1;
            spim_mem_ack  = 1;
            next_state    = IDLE;
 	end

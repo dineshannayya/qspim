@@ -76,6 +76,10 @@
 ////             1. Changed Dummy to 2 to 4 bit                   ////
 ////             2. CS Address Map and Mask Reg added for Direct  ////
 ////                access mode                                   ////
+////             3. Seperated spi init and spi final mode config  ////
+////                cfg_m*_spi_imode & cfg_m*_spi_fmode           ////
+////                *_imode loaded at init place of CS Assertion  ////
+////                & *_fmode loaded on switching place           //// 
 ////                                                              ////
 //////////////////////////////////////////////////////////////////////
 ////                                                              ////
@@ -157,7 +161,8 @@ module qspim_top
     logic  [7:0]                  cfg_m0_cs3_amask;
     logic                         cfg_m0_fsm_reset ;
     logic [3:0]                       m0_cs_reg    ;  // Chip select
-    logic [1:0]                   cfg_m0_spi_mode  ;  // Final SPI Mode 
+    logic [1:0]                   cfg_m0_spi_imode ;  // Init SPI Mode 
+    logic [1:0]                   cfg_m0_spi_fmode ;  // Final SPI Mode 
     logic [1:0]                   cfg_m0_spi_switch;  // SPI Mode Switching Place
     logic [3:0]                   cfg_m0_spi_seq   ;  // SPI SEQUENCE
     logic [1:0]                   cfg_m0_addr_cnt  ;  // SPI Addr Count
@@ -167,7 +172,8 @@ module qspim_top
     logic [7:0]                   cfg_m0_mode_reg  ;  // SPI MODE REG
 
     logic [3:0]                   cfg_m1_cs_reg    ;  // Chip select
-    logic [1:0]                   cfg_m1_spi_mode  ;  // Final SPI Mode 
+    logic [1:0]                   cfg_m1_spi_imode ;  // Init SPI Mode 
+    logic [1:0]                   cfg_m1_spi_fmode ;  // Final SPI Mode 
     logic [1:0]                   cfg_m1_spi_switch;  // SPI Mode Switching Place
 
     logic [1:0]                   cfg_cs_early     ;  // Amount of cycle early CS asserted
@@ -352,6 +358,7 @@ qspim_if #( .WB_WIDTH(WB_WIDTH),.CMD_FIFO_WD(CMD_FIFO_WD)) u_wb_if(
         .spim_reg_rdata                 (spim_reg_rdata               ), // Read Read Data
 
     // Towards Command FIFO
+        .cmd_fifo_full                  (m0_cmd_fifo_full             ), // Command FIFO full
         .cmd_fifo_empty                 (m0_cmd_fifo_empty            ), // Command FIFO empty
         .cmd_fifo_wr                    (m0_cmd_fifo_wr               ), // Command FIFO Write
         .cmd_fifo_wdata                 (m0_cmd_fifo_wdata            ), // Command FIFO WData
@@ -391,7 +398,8 @@ qspim_regs
 	.cfg_m0_cs3_amask               (cfg_m0_cs3_amask             ),
 
         .cfg_m0_fsm_reset               (cfg_m0_fsm_reset             ),
-        .cfg_m0_spi_mode                (cfg_m0_spi_mode              ), // Final SPI Mode 
+        .cfg_m0_spi_imode               (cfg_m0_spi_imode             ), // Init SPI Mode 
+        .cfg_m0_spi_fmode               (cfg_m0_spi_fmode             ), // Final SPI Mode 
         .cfg_m0_spi_switch              (cfg_m0_spi_switch            ), // SPI Mode Switching Place
         .cfg_m0_spi_seq                 (cfg_m0_spi_seq               ), // SPI SEQUENCE
         .cfg_m0_addr_cnt                (cfg_m0_addr_cnt              ), // SPI Addr Count
@@ -401,7 +409,8 @@ qspim_regs
         .cfg_m0_mode_reg                (cfg_m0_mode_reg              ), // SPI MODE REG
 
         .cfg_m1_cs_reg                  (cfg_m1_cs_reg                ), // Chip select
-        .cfg_m1_spi_mode                (cfg_m1_spi_mode              ), // Final SPI Mode 
+        .cfg_m1_spi_imode               (cfg_m1_spi_imode             ), // Final SPI Mode 
+        .cfg_m1_spi_fmode               (cfg_m1_spi_fmode             ), // Final SPI Mode 
         .cfg_m1_spi_switch              (cfg_m1_spi_switch            ), // SPI Mode Switching Place
 
 	.cfg_cs_early                   (cfg_cs_early                 ),
@@ -433,7 +442,7 @@ qspim_regs
     );
 
  // Master 0 Command FIFO
-qspim_fifo #(.W(CMD_FIFO_WD), .DP(2)) u_m0_cmd_fifo (
+qspim_fifo #(.W(CMD_FIFO_WD), .DP(4)) u_m0_cmd_fifo (
 	 .clk                           (mclk                        ),
          .reset_n                       (rst_ss_n                    ),
 	 .flush                         (1'b0                        ),
@@ -501,11 +510,13 @@ qspim_ctrl #(.CMD_FIFO_WD(CMD_FIFO_WD)) u_spictrl
         .spi_status                     (spi_ctrl_status              ),
 
         .cfg_m0_cs_reg                  (m0_cs_reg                    ), // Chip select
-        .cfg_m0_spi_mode                (cfg_m0_spi_mode              ), // Final SPI Mode 
+        .cfg_m0_spi_imode               (cfg_m0_spi_imode             ), // Init SPI Mode 
+        .cfg_m0_spi_fmode               (cfg_m0_spi_fmode             ), // Final SPI Mode 
         .cfg_m0_spi_switch              (cfg_m0_spi_switch            ), // SPI Mode Switching Place
 
         .cfg_m1_cs_reg                  (cfg_m1_cs_reg                ), // Chip select
-        .cfg_m1_spi_mode                (cfg_m1_spi_mode              ), // Final SPI Mode 
+        .cfg_m1_spi_imode               (cfg_m1_spi_imode             ), // Init SPI Mode 
+        .cfg_m1_spi_fmode               (cfg_m1_spi_fmode             ), // Final SPI Mode 
         .cfg_m1_spi_switch              (cfg_m1_spi_switch            ), // SPI Mode Switching Place
 
 	.cfg_cs_early                   (cfg_cs_early                 ),

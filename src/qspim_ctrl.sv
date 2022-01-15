@@ -74,11 +74,13 @@ module qspim_ctrl  #(
 
     // Master 0 Configuration
     input  logic [3:0]                   cfg_m0_cs_reg    ,  // Chip select
-    input  logic [1:0]                   cfg_m0_spi_mode  ,  // Final SPI Mode 
+    input  logic [1:0]                   cfg_m0_spi_imode  ,  // Init SPI Mode 
+    input  logic [1:0]                   cfg_m0_spi_fmode  ,  // Final SPI Mode 
     input  logic [1:0]                   cfg_m0_spi_switch,  // SPI Mode Switching Place
 
     input  logic [3:0]                   cfg_m1_cs_reg    ,  // Chip select
-    input  logic [1:0]                   cfg_m1_spi_mode  ,  // Final SPI Mode 
+    input  logic [1:0]                   cfg_m1_spi_imode  ,  // Init SPI Mode 
+    input  logic [1:0]                   cfg_m1_spi_fmode  ,  // Final SPI Mode 
     input  logic [1:0]                   cfg_m1_spi_switch,  // SPI Mode Switching Place
 
     input  logic [1:0]                   cfg_cs_early     ,  // Amount of cycle early CS asserted
@@ -178,10 +180,11 @@ parameter P_FSM_CAMDR  = 4'b0110; // Command -> Address -> Mode -> Dummy -> Read
 
 parameter P_FSM_CAW    = 4'b0111; // Command -> Address ->Write Data
 parameter P_FSM_CADW   = 4'b1000; // Command -> Address -> DUMMY + Write Data
+parameter P_FSM_CAMW   = 4'b1001; // Command -> Address -> MODE + Write Data
 
-parameter P_FSM_CDR    = 4'b1001; // COMMAND -> DUMMY -> READ
-parameter P_FSM_CDW    = 4'b1010; // COMMAND -> DUMMY -> WRITE
-parameter P_FSM_CR     = 4'b1011;  // COMMAND -> READ
+parameter P_FSM_CDR    = 4'b1010; // COMMAND -> DUMMY -> READ
+parameter P_FSM_CDW    = 4'b1011; // COMMAND -> DUMMY -> WRITE
+parameter P_FSM_CR     = 4'b1100;  // COMMAND -> READ
 
 //---------------------
   parameter P_8BIT   = 2'b00;
@@ -254,12 +257,14 @@ parameter P_FSM_CR     = 4'b1011;  // COMMAND -> READ
   // Configuration
   //----------------------------
   logic [3:0]  cfg_cs_reg    ;  // Chip select
-  logic [1:0]  cfg_spi_mode  ;  // Final SPI Mode 
+  logic [1:0]  cfg_spi_imode ;  // Init SPI Mode 
+  logic [1:0]  cfg_spi_fmode ;  // Final SPI Mode 
   logic [1:0]  cfg_spi_switch;  // SPI Mode Switching Place
 
   
   assign cfg_cs_reg     = (gnt == 2'b01) ? cfg_m0_cs_reg    : cfg_m1_cs_reg;
-  assign cfg_spi_mode   = (gnt == 2'b01) ? cfg_m0_spi_mode  : cfg_m1_spi_mode;  // Final SPI Mode 
+  assign cfg_spi_imode  = (gnt == 2'b01) ? cfg_m0_spi_imode  : cfg_m1_spi_imode;  // Final SPI Mode 
+  assign cfg_spi_fmode  = (gnt == 2'b01) ? cfg_m0_spi_fmode  : cfg_m1_spi_fmode;  // Final SPI Mode 
   assign cfg_spi_switch = (gnt == 2'b01) ? cfg_m0_spi_switch: cfg_m1_spi_switch;  // SPI Mode Switching Place
 
   //----------------------------
@@ -467,6 +472,7 @@ parameter P_FSM_CR     = 4'b1011;  // COMMAND -> READ
 	      P_FSM_CAMDR: next_state = FSM_ADR_PHASE;
 	      P_FSM_CAW:   next_state = FSM_ADR_PHASE;
 	      P_FSM_CADW:  next_state = FSM_ADR_PHASE;
+	      P_FSM_CAMW:  next_state = FSM_ADR_PHASE;
 	      P_FSM_CDR:   next_state = FSM_DUMMY_PHASE;
 	      P_FSM_CDW:   next_state = FSM_DUMMY_PHASE;
 	      P_FSM_CR:    next_state = FSM_READ_WAIT;
@@ -496,6 +502,7 @@ parameter P_FSM_CR     = 4'b1011;  // COMMAND -> READ
 	      P_FSM_CAMDR: next_state = FSM_MODE_PHASE;
 	      P_FSM_CAW:   next_state = FSM_WRITE_CMD;
 	      P_FSM_CADW:  next_state = FSM_DUMMY_PHASE;
+	      P_FSM_CAMW:  next_state = FSM_MODE_PHASE;
 	      default  :   next_state = FSM_TX_DONE;
               endcase
            end
@@ -534,6 +541,7 @@ parameter P_FSM_CR     = 4'b1011;  // COMMAND -> READ
 	      case(cfg_spi_seq)
 	      P_FSM_CAMR:  next_state = FSM_READ_WAIT;
 	      P_FSM_CAMDR: next_state = FSM_DUMMY_PHASE;
+	      P_FSM_CAMW:  next_state = FSM_WRITE_CMD;
 	      default  :   next_state = FSM_CS_DEASEERT;
               endcase
            end
@@ -668,7 +676,8 @@ end
   // SPI Mode Switch Control Logic
   // Note: SPI Protocl Start with SPI_STD Mode (Sigle Bit Mode) Base on the
   // Command, Type it Switch the mode at ADDRESS/DUMMY/DATA Phase
-  // QIOR(0xEB) -> Mode switch at Address Phase
+  // QIOR(0xEB) -> Mode switch at Idle Phase (sram)
+  // QIOR(0xEB) -> Mode switch at Address Phase (Flash)
   // DIOR(0xBB) -> Mode Switch at Address Phase
   // QOR (0x6B) -> Mode Switch at Data Phase
   // DOR (0x3B) -> Mode Switch at Data Phase
@@ -680,10 +689,12 @@ end
      end else begin
 	if(state == FSM_IDLE) begin // Reset the Mode at IDLE State
             s_spi_mode <= P_SINGLE;
+	end else if(state == FSM_CS_ASSERT && cfg_spi_switch == P_MODE_SWITCH_IDLE) begin
+            s_spi_mode <= cfg_spi_imode;
 	end else if(state == FSM_ADR_PHASE && cfg_spi_switch == P_MODE_SWITCH_AT_ADDR) begin
-            s_spi_mode <= cfg_spi_mode;
+            s_spi_mode <= cfg_spi_fmode;
 	end else if(((state == FSM_READ_PHASE) || state == FSM_WRITE_CMD ) && cfg_spi_switch == P_MODE_SWITCH_AT_DATA) begin
-            s_spi_mode <= cfg_spi_mode;
+            s_spi_mode <= cfg_spi_fmode;
 	end
      end
   end
