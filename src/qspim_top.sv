@@ -51,14 +51,14 @@
 ////      - Dinesh Annayya, dinesha@opencores.org                 ////
 ////                                                              ////
 ////  Revision :                                                  ////
-////     V.0  -  June 8, 2021                                     //// 
-////     V.1  - June 25, 2021                                     ////
+////     0.0  -  June 8, 2021                                     //// 
+////     0.1  - June 25, 2021                                     ////
 ////            Pad logic is brought inside the block to avoid    ////
 ////            logic at digital core level for caravel project   ////
-////     V.2  - July 6, 2021                                      ////
+////     0.2  - July 6, 2021                                      ////
 ////            Added Hold fix cell for SPI data out signal to    ////
 ////            met interface hold                                ////
-////     V.3  - July 13, 2021                                     ////
+////     0.3  - July 13, 2021                                     ////
 ////            Data Prefetch feature added in M0 port, If Only   ////
 ////            M0 Read used, then Prefetch read can be 255 Byte, ////
 ////            But if the Both M0 and M1 read access enabled,    ////
@@ -66,13 +66,13 @@
 ////            with in 8DW or 32 Byte, else there is chance      ////
 ////            data path can hang due to response FIFO full due  ////
 ////            to partial reading of data                        ////
-////     V.4  -  July 26, 2021                                    ////
+////     0.4  -  July 26, 2021                                    ////
 ////             QDDR (0xED) supported is added                   ////
-////     V.5  -  Nov 6, 2021                                      ////
+////     0.5  -  Nov 6, 2021                                      ////
 ////             Clock Skew Moves inside the block                ////
-////     V.6  -  Jan 13, 2022                                     ////
+////     0.6  -  Jan 13, 2022                                     ////
 ////             All CS# brougt out from block                    ////
-////     V.7  -  Jan 14, 2022                                     ////
+////     0.7  -  Jan 14, 2022                                     ////
 ////             1. Changed Dummy to 2 to 4 bit                   ////
 ////             2. CS Address Map and Mask Reg added for Direct  ////
 ////                access mode                                   ////
@@ -80,6 +80,8 @@
 ////                cfg_m*_spi_imode & cfg_m*_spi_fmode           ////
 ////                *_imode loaded at init place of CS Assertion  ////
 ////                & *_fmode loaded on switching place           //// 
+////     1.0  - Jan 25, 2022, Dinesh A                            ////
+////             Direct memory Burst Mode support is added        ///
 ////                                                              ////
 //////////////////////////////////////////////////////////////////////
 ////                                                              ////
@@ -112,7 +114,7 @@
 
 module qspim_top
 #( parameter WB_WIDTH = 32,
-   parameter CMD_FIFO_WD = 36)
+   parameter CMD_FIFO_WD = 40)
 (
 `ifdef USE_POWER_PINS
          input logic            vccd1,    // User area 1 1.8V supply
@@ -131,8 +133,11 @@ module qspim_top
     input  logic                         wbd_we_i,  // write
     input  logic   [WB_WIDTH-1:0]        wbd_dat_i, // data output
     input  logic   [3:0]                 wbd_sel_i, // byte enable
+    input  logic   [9:0]                 wbd_bl_i,  // Burst Length
+    input  logic                         wbd_bry_i, // Burst Ready
     output logic   [WB_WIDTH-1:0]        wbd_dat_o, // data input
     output logic                         wbd_ack_o, // acknowlegement
+    output logic                         wbd_lack_o,// Last acknowlegement
     output logic                         wbd_err_o,  // error
 
     output logic                 [31:0]  spi_debug,
@@ -160,7 +165,7 @@ module qspim_top
     logic  [7:0]                  cfg_m0_cs2_amask;
     logic  [7:0]                  cfg_m0_cs3_amask;
     logic                         cfg_m0_fsm_reset ;
-    logic [3:0]                       m0_cs_reg    ;  // Chip select
+    logic [3:0]                   m0_cs_reg    ;  // Chip select
     logic [1:0]                   cfg_m0_spi_imode ;  // Init SPI Mode 
     logic [1:0]                   cfg_m0_spi_fmode ;  // Final SPI Mode 
     logic [1:0]                   cfg_m0_spi_switch;  // SPI Mode Switching Place
@@ -319,12 +324,15 @@ qspim_if #( .WB_WIDTH(WB_WIDTH),.CMD_FIFO_WD(CMD_FIFO_WD)) u_wb_if(
 
         .wbd_stb_i                      (wbd_stb_i                    ), // strobe/request
         .wbd_adr_i                      (wbd_adr_i                    ), // address
-        .wbd_we_i                       (wbd_we_i                     ),  // write
+        .wbd_we_i                       (wbd_we_i                     ), // write
         .wbd_dat_i                      (wbd_dat_i                    ), // data output
         .wbd_sel_i                      (wbd_sel_i                    ), // byte enable
+        .wbd_bl_i                       (wbd_bl_i                     ), // Busrt length
+        .wbd_bry_i                      (wbd_bry_i                    ), // Busrt Ready
         .wbd_dat_o                      (wbd_dat_o                    ), // data input
         .wbd_ack_o                      (wbd_ack_o                    ), // acknowlegement
-        .wbd_err_o                      (wbd_err_o                    ),  // error
+        .wbd_lack_o                     (wbd_lack_o                   ), // last acknowlegement
+        .wbd_err_o                      (wbd_err_o                    ), // error
 
     // Configuration
 	.cfg_m0_cs0_addr                (cfg_m0_cs0_addr              ),

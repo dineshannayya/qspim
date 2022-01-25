@@ -69,7 +69,7 @@
 //////////////////////////////////////////////////////////////////////
 
 
-module qspim_if #( parameter WB_WIDTH = 32,parameter CMD_FIFO_WD=36) (
+module qspim_if #( parameter WB_WIDTH = 32,parameter CMD_FIFO_WD=40) (
     input  logic                         mclk,
     input  logic                         rst_n,
 
@@ -78,8 +78,11 @@ module qspim_if #( parameter WB_WIDTH = 32,parameter CMD_FIFO_WD=36) (
     input  logic                         wbd_we_i,  // write
     input  logic   [WB_WIDTH-1:0]        wbd_dat_i, // data output
     input  logic   [3:0]                 wbd_sel_i, // byte enable
+    input  logic   [9:0]                 wbd_bl_i,  // Burst Length
+    input  logic                         wbd_bry_i, // Burst Ready
     output logic   [WB_WIDTH-1:0]        wbd_dat_o, // data input
     output logic                         wbd_ack_o, // acknowlegement
+    output logic                         wbd_lack_o,// Last acknowlegement
     output logic                         wbd_err_o,  // error
 
 
@@ -149,20 +152,22 @@ parameter WRITE_DATA = 4'b0100;
 logic                 spim_mem_req   ;  // Current Request is Direct Memory Read
 
 
-logic                 spim_wb_req    ;
 logic [WB_WIDTH-1:0]  spim_wb_wdata  ;
 logic [WB_WIDTH-1:0]  spim_wb_addr   ;
-logic                 spim_wb_ack    ;
 logic                 spim_wb_we     ;
 logic [3:0]           spim_wb_be     ;
 logic [WB_WIDTH-1:0]  spi_mem_rdata  ;
 logic [WB_WIDTH-1:0]  spim_wb_rdata  ;
+logic                 wbd_stb_d      ;
+logic                 wbd_stb_l      ;
 
+logic [9:0]           wbd_bl_cnt     ;
+logic [9:0]           next_wbd_bl_cnt;
 logic                 spim_mem_ack   ;
 logic [3:0]           next_state     ;
 
 logic 	              NextPreDVal    ;
-logic [7:0]	      NextPreDCnt    ;
+logic [9:0]	      NextPreDCnt    ;
 logic [31:0]	      NextPreAddr    ;
 
 
@@ -176,33 +181,51 @@ logic [31:0]	      NextPreAddr    ;
   // will be done inside the wishbone inter-connect 
   // --------------------------------------------------------------
 
-  assign spim_mem_req = ((spim_wb_req) && spim_wb_addr[28] == 1'b0);
-  assign spim_reg_req = ((spim_wb_req) && spim_wb_addr[28] == 1'b1);
+  assign spim_mem_req = ((wbd_stb_i) && wbd_adr_i[28] == 1'b0);
 
-  assign spim_reg_addr = spim_wb_addr[5:2];
+  // Generate Once cycle delayed wbd_stb_l
+  assign spim_reg_req = ((wbd_stb_d) && spim_wb_addr[28] == 1'b1);
+
+  assign spim_reg_addr  = spim_wb_addr[5:2];
   assign spim_reg_wdata = spim_wb_wdata;
-  assign spim_reg_we   = spim_wb_we;
-  assign spim_reg_be   = spim_wb_be;
+  assign spim_reg_we    = spim_wb_we;
+  assign spim_reg_be    = spim_wb_be;
 
-  assign wbd_dat_o  =  spim_wb_rdata;
-  assign wbd_ack_o  =  spim_wb_ack;
+  assign wbd_dat_o  =  (spim_mem_req && !wbd_we_i) ? spi_mem_rdata :
+	               (spim_reg_req && !wbd_we_i ) ? spim_reg_rdata: 'h0;
   assign wbd_err_o  =  1'b0;
+
+  assign wbd_ack_o  =  (spim_mem_req) ? spim_mem_ack : 
+	               (spim_reg_req) ? spim_reg_ack : 1'b0;
+
+  assign wbd_lack_o   = (spim_mem_req) ? ((wbd_bl_i == 'h1) ? spim_mem_ack : (wbd_bl_cnt == 'h2) &  spim_mem_ack) :
+	                ((spim_reg_req) ? spim_reg_ack : 1'b0);
+
+
+  // Detect Pos Edge of strobe
+  wire wbd_stb_pedge = (wbd_stb_i && !wbd_stb_l);
 
   // To reduce the load/Timing Wishbone I/F, all the variable are registered
 always_ff @(negedge rst_n or posedge mclk) begin
     if ( rst_n == 1'b0 ) begin
-        spim_wb_req   <= '0;
         spim_wb_wdata <= '0;
         spim_wb_rdata <= '0;
         spim_wb_addr  <= '0;
         spim_wb_be    <= '0;
         spim_wb_we    <= '0;
-        spim_wb_ack   <= '0;
+	wbd_stb_l     <= '0;
    end else begin
 	if(spi_init_done) begin // Wait for internal SPI Init Done
-            spim_wb_req   <= wbd_stb_i && ((spim_wb_ack == 0) && (spim_mem_ack ==0) && (spim_reg_ack == 0));
+	    wbd_stb_l     <= wbd_stb_i;
+	    wbd_stb_d     <= wbd_stb_i & !wbd_ack_o;
+      	    wbd_bl_cnt   <= next_wbd_bl_cnt;
+	    if(wbd_stb_pedge) begin
+	       spim_wb_addr <= wbd_adr_i;
+            end else if(wbd_ack_o) begin
+               spim_wb_addr <= spim_wb_addr+4;
+	    end
+
             spim_wb_wdata <= wbd_dat_i;
-            spim_wb_addr  <= wbd_adr_i;
             spim_wb_be    <= wbd_sel_i;
             spim_wb_we    <= wbd_we_i;
     
@@ -212,8 +235,6 @@ always_ff @(negedge rst_n or posedge mclk) begin
             else if (spim_reg_req && spim_reg_ack)
                    spim_wb_rdata <= spim_reg_rdata;
     
-            spim_wb_ack   <= (spim_mem_req) ? spim_mem_ack :
-		             (spim_reg_req) ? spim_reg_ack : 1'b0;
        end
    end
 end
@@ -225,7 +246,7 @@ always_ff @(negedge rst_n or posedge mclk) begin
     if ( rst_n == 1'b0 ) begin
 	m0_cs_reg <= 4'b0;
     end else begin
-	if(spim_mem_req) begin
+	if(state == ADR_PHASE) begin
            m0_cs_reg[0] <=  ((spim_wb_addr[27:20] & cfg_m0_cs0_amask) == cfg_m0_cs0_addr) ;
            m0_cs_reg[1] <=  ((spim_wb_addr[27:20] & cfg_m0_cs1_amask) == cfg_m0_cs1_addr) ;
            m0_cs_reg[2] <=  ((spim_wb_addr[27:20] & cfg_m0_cs2_amask) == cfg_m0_cs2_addr) ;
@@ -253,6 +274,7 @@ begin
    cmd_fifo_wdata = '0;
    res_fifo_rd    = 0;
    spi_mem_rdata = '0;
+   next_wbd_bl_cnt  = wbd_bl_cnt;
 
    spim_mem_ack   = 0;
    next_state     = state;
@@ -261,20 +283,21 @@ begin
 	// Check If any prefetch data available and if see it matched with WB
 	// address, If yes, the move to data reading from response fifo, else 
 	// generate command request
-	if(spim_mem_req && !wbd_we_i && NextPreDVal && (spim_wb_addr == NextPreAddr)) begin
+	if(spim_mem_req && !wbd_we_i && NextPreDVal && (wbd_adr_i == NextPreAddr)) begin
           next_state = READ_DATA;
 	end else if(spim_mem_req && cmd_fifo_empty) begin
-	   cmd_fifo_wdata = {SOC,NOC,cfg_data_cnt[7:0],cfg_dummy_cnt[3:0],cfg_addr_cnt[1:0],cfg_mem_seq[3:0],cfg_mode_reg[7:0],cfg_cmd_reg[7:0]};
+	   cmd_fifo_wdata = {SOC,NOC,{wbd_bl_i[9:0],2'b0},cfg_dummy_cnt[3:0],cfg_addr_cnt[1:0],cfg_mem_seq[3:0],cfg_mode_reg[7:0],cfg_cmd_reg[7:0]};
+	   next_wbd_bl_cnt = wbd_bl_i;
 	   cmd_fifo_wr    = 1;
 	   next_state = ADR_PHASE;
 	end
    end
    ADR_PHASE: begin
 	  if(spim_wb_we) begin
-              cmd_fifo_wdata = {NOC,NOC,2'b0,spim_wb_addr[31:0]};
+              cmd_fifo_wdata = {NOC,NOC,6'b0,spim_wb_addr[31:0]};
              next_state = WRITE_DATA;
           end else begin
-              cmd_fifo_wdata = {NOC,EOC,2'b0,spim_wb_addr[31:0]};
+              cmd_fifo_wdata = {NOC,EOC,6'b0,spim_wb_addr[31:0]};
              next_state = CMD_WAIT;
           end
           cmd_fifo_wr      = 1;
@@ -287,19 +310,23 @@ begin
 
 
    READ_DATA: begin
-	if(res_fifo_empty != 1) begin
-           spi_mem_rdata = res_fifo_rdata;
+	if(res_fifo_empty != 1 && wbd_bry_i) begin
+           spi_mem_rdata    = res_fifo_rdata;
+	   next_wbd_bl_cnt  = wbd_bl_cnt-1;
 	   res_fifo_rd   = 1;
            spim_mem_ack  = 1;
-           next_state    = IDLE;
+	   if(next_wbd_bl_cnt == 0) 
+               next_state    = IDLE;
 	end
    end
    WRITE_DATA: begin
-	if(cmd_fifo_full != 1) begin
-           cmd_fifo_wdata = {NOC,EOC,2'b0,spim_wb_wdata[31:0]};
-           cmd_fifo_wr      = 1;
+	if(cmd_fifo_full != 1 && wbd_bry_i) begin
+           cmd_fifo_wdata = {NOC,EOC,6'b0,spim_wb_wdata[31:0]};
+	   next_wbd_bl_cnt = wbd_bl_cnt-1;
+           cmd_fifo_wr    = 1;
            spim_mem_ack  = 1;
-           next_state    = IDLE;
+	   if(next_wbd_bl_cnt == 0) 
+               next_state    = IDLE;
 	end
    end
    endcase
@@ -320,14 +347,14 @@ always_ff @(negedge rst_n or posedge mclk) begin
 	NextPreAddr       <= 'h0;
     end else if(cmd_fifo_wr) begin
        NextPreDVal    <= 1'b1;
-       NextPreDCnt    <= cfg_data_cnt;
-       NextPreAddr    <= spim_wb_addr;
+       NextPreDCnt    <= wbd_bl_i; // Word Count
+       NextPreAddr    <= wbd_adr_i;
     end else if (res_fifo_rd) begin
-	if(NextPreDCnt == 4) begin
+	if(NextPreDCnt == 1) begin
             NextPreDVal <= 1'b0;
         end else begin
-           NextPreDCnt <= NextPreDCnt-4;
-           NextPreAddr <= NextPreAddr+4;
+           NextPreDCnt <= NextPreDCnt-1;
+           NextPreAddr <= NextPreAddr+1;
         end
     end
 end

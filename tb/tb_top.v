@@ -190,14 +190,18 @@ parameter P_QDDR   = 2'b11;
         reg        wbd_ext_cyc_i;  // strobe/request
         reg        wbd_ext_stb_i;  // strobe/request
         reg [31:0] wbd_ext_adr_i;  // address
-        reg        wbd_ext_we_i;  // write
+        reg        wbd_ext_we_i;   // write
+        reg        wbd_ext_bry_i;  // Busrt Ready
+        reg [9:0]  wbd_ext_bl_i;   // Burst Length
         reg [31:0] wbd_ext_dat_i;  // data output
         reg [3:0]  wbd_ext_sel_i;  // byte enable
 
         wire [31:0] wbd_ext_dat_o;  // data input
         wire        wbd_ext_ack_o;  // acknowlegement
+        wire        wbd_ext_lack_o;  // acknowlegement
         wire        wbd_ext_err_o;  // error
 
+	reg [31:0]  data_array [0 : 511]; // Data Array
 	reg         test_fail;
 	reg [31:0] read_data;
 
@@ -224,6 +228,8 @@ parameter P_QDDR   = 2'b11;
                 wbd_ext_stb_i ='h0;  // strobe/request
                 wbd_ext_adr_i ='h0;  // address
                 wbd_ext_we_i  ='h0;  // write
+                wbd_ext_bry_i = 1'b1;
+                wbd_ext_bl_i  = 10'h1;
                 wbd_ext_dat_i ='h0;  // data output
                 wbd_ext_sel_i ='h0;  // byte enable
 	end
@@ -1075,8 +1081,136 @@ parameter P_QDDR   = 2'b11;
 		wb_user_core_read_check(`QSPIM_IMEM_RDATA,read_data,32'h00020058);
 		wb_user_core_read_check(`QSPIM_IMEM_RDATA,read_data,32'h00020059);
 
+		$display("#############################################");
+		$display("  Page Read through Direct Burst Access       ");
+		$display("#############################################");
+
+		data_array[10'h0]    = 32'h00010000;
+		data_array[10'h1]    = 32'h00010001;
+		data_array[10'h2]    = 32'h00010002;
+		data_array[10'h3]    = 32'h00010003;
+		data_array[10'h4]    = 32'h00010004;
+		data_array[10'h5]    = 32'h00010005;
+		data_array[10'h6]    = 32'h00010006;
+		data_array[10'h7]    = 32'h00010007;
+		data_array[10'h8]    = 32'h00010008;
+		data_array[10'h9]    = 32'h00010009;
+		data_array[10'hA]    = 32'h00010010;
+		data_array[10'hB]    = 32'h00010011;
+		data_array[10'hC]    = 32'h00010012;
+		data_array[10'hD]    = 32'h00010013;
+		data_array[10'hE]    = 32'h00010014;
+		data_array[10'hF]    = 32'h00010015;
+		data_array[10'h10]   = 32'h00010016;
+		data_array[10'h11]   = 32'h00010017;
+		data_array[10'h12]   = 32'h00010018;
+		data_array[10'h13]   = 32'h00010019;
+		data_array[10'h14]   = 32'h00010020;
+		data_array[10'h15]   = 32'h00010021;
+		data_array[10'h16]   = 32'h00010022;
+		data_array[10'h17]   = 32'h00010023;
+		data_array[10'h18]   = 32'h00010024;
+		data_array[10'h19]   = 32'h00010025;
+		data_array[10'h1A]   = 32'h00010026;
+		data_array[10'h1B]   = 32'h00010027;
+		data_array[10'h1C]   = 32'h00010028;
+		data_array[10'h1D]   = 32'h00010029;
+		data_array[10'h1E]   = 32'h00010030;
+		data_array[10'h1F]   = 32'h00010031;
+		data_array[10'h20]   = 32'h00010032;
+		data_array[10'h21]   = 32'h00010033;
+		data_array[10'h22]   = 32'h00010034;
+		data_array[10'h23]   = 32'h00010035;
+		data_array[10'h24]   = 32'h00010036;
+		data_array[10'h25]   = 32'h00010037;
+		data_array[10'h26]   = 32'h00010038;
+		data_array[10'h27]   = 32'h00010039;
+		data_array[10'h28]   = 32'h00010040;
+		data_array[10'h29]   = 32'h00010041;
+		data_array[10'h2A]   = 32'h00010042;
+		data_array[10'h2B]   = 32'h00010043;
+		data_array[10'h2C]   = 32'h00010044;
+		data_array[10'h2D]   = 32'h00010045;
+		data_array[10'h2E]   = 32'h00010046;
+		data_array[10'h2F]   = 32'h00010047;
+		data_array[10'h30]   = 32'h00010048;
+		data_array[10'h31]   = 32'h00010049;
+		data_array[10'h32]   = 32'h00010050;
+		data_array[10'h33]   = 32'h00010051;
+		data_array[10'h34]   = 32'h00010052;
+		data_array[10'h35]   = 32'h00010053;
+		data_array[10'h36]   = 32'h00010054;
+		data_array[10'h37]   = 32'h00010055;
+		data_array[10'h38]   = 32'h00010056;
+		data_array[10'h39]   = 32'h00010057;
+		data_array[10'h3A]   = 32'h00010058;
+		data_array[10'h3B]   = 32'h00010059;
+		wb_user_core_bread_check(32'h00000000,10'h3C);
+
+		data_array[10'h0]    = 32'h00020000;
+		data_array[10'h1]    = 32'h00020001;
+		data_array[10'h2]    = 32'h00020002;
+		data_array[10'h3]    = 32'h00020003;
+		data_array[10'h4]    = 32'h00020004;
+		data_array[10'h5]    = 32'h00020005;
+		data_array[10'h6]    = 32'h00020006;
+		data_array[10'h7]    = 32'h00020007;
+		data_array[10'h8]    = 32'h00020008;
+		data_array[10'h9]    = 32'h00020009;
+		data_array[10'hA]    = 32'h00020010;
+		data_array[10'hB]    = 32'h00020011;
+		data_array[10'hC]    = 32'h00020012;
+		data_array[10'hD]    = 32'h00020013;
+		data_array[10'hE]    = 32'h00020014;
+		data_array[10'hF]    = 32'h00020015;
+		data_array[10'h10]   = 32'h00020016;
+		data_array[10'h11]   = 32'h00020017;
+		data_array[10'h12]   = 32'h00020018;
+		data_array[10'h13]   = 32'h00020019;
+		data_array[10'h14]   = 32'h00020020;
+		data_array[10'h15]   = 32'h00020021;
+		data_array[10'h16]   = 32'h00020022;
+		data_array[10'h17]   = 32'h00020023;
+		data_array[10'h18]   = 32'h00020024;
+		data_array[10'h19]   = 32'h00020025;
+		data_array[10'h1A]   = 32'h00020026;
+		data_array[10'h1B]   = 32'h00020027;
+		data_array[10'h1C]   = 32'h00020028;
+		data_array[10'h1D]   = 32'h00020029;
+		data_array[10'h1E]   = 32'h00020030;
+		data_array[10'h1F]   = 32'h00020031;
+		data_array[10'h20]   = 32'h00020032;
+		data_array[10'h21]   = 32'h00020033;
+		data_array[10'h22]   = 32'h00020034;
+		data_array[10'h23]   = 32'h00020035;
+		data_array[10'h24]   = 32'h00020036;
+		data_array[10'h25]   = 32'h00020037;
+		data_array[10'h26]   = 32'h00020038;
+		data_array[10'h27]   = 32'h00020039;
+		data_array[10'h28]   = 32'h00020040;
+		data_array[10'h29]   = 32'h00020041;
+		data_array[10'h2A]   = 32'h00020042;
+		data_array[10'h2B]   = 32'h00020043;
+		data_array[10'h2C]   = 32'h00020044;
+		data_array[10'h2D]   = 32'h00020045;
+		data_array[10'h2E]   = 32'h00020046;
+		data_array[10'h2F]   = 32'h00020047;
+		data_array[10'h30]   = 32'h00020048;
+		data_array[10'h31]   = 32'h00020049;
+		data_array[10'h32]   = 32'h00020050;
+		data_array[10'h33]   = 32'h00020051;
+		data_array[10'h34]   = 32'h00020052;
+		data_array[10'h35]   = 32'h00020053;
+		data_array[10'h36]   = 32'h00020054;
+		data_array[10'h37]   = 32'h00020055;
+		data_array[10'h38]   = 32'h00020056;
+		data_array[10'h39]   = 32'h00020057;
+		data_array[10'h3A]   = 32'h00020058;
+		data_array[10'h3B]   = 32'h00020059;
+		wb_user_core_bread_check(32'h00000200,10'h3C);
+	        /**
 		//-----------------------------------------------------------------
-		//  SRAM TESTING SEQUENCE START HERE
+		//  FRAM TESTING SEQUENCE START HERE
 		//
 		// Important: Config the FRAM to QURD MODE to make the SRAM
 		// RESET pin to behave like to data pin. Other wise
@@ -1119,24 +1253,25 @@ parameter P_QDDR   = 2'b11;
 		// QDDR Config
 		wb_user_core_write(`QSPIM_DMEM_CTRL1,{16'h0,1'b0,1'b0,4'b0000,P_MODE_SWITCH_IDLE,P_QUAD,P_QUAD,4'b0001});
 		wb_user_core_write(`QSPIM_DMEM_CTRL2,{8'h04,2'b00,2'b10,P_FSM_CAMDR,8'h00,8'hEB});
-		wb_user_core_read_check(32'h01000000,read_data,32'h03020100);
-		wb_user_core_read_check(32'h01000004,read_data,32'h07060504);
-		wb_user_core_read_check(32'h01000008,read_data,32'h0b0a0908);
-		wb_user_core_read_check(32'h0100000C,read_data,32'h0f0e0d0c);
-		wb_user_core_read_check(32'h01000010,read_data,32'h13121110);
-		wb_user_core_read_check(32'h01000014,read_data,32'h17161514);
-		wb_user_core_read_check(32'h01000018,read_data,32'h1b1a1918);
-		wb_user_core_read_check(32'h0100001C,read_data,32'h1f1e1d1c);
-		wb_user_core_read_check(32'h01000020,read_data,32'h23222120);
-		wb_user_core_read_check(32'h01000024,read_data,32'h27262524);
-		wb_user_core_read_check(32'h01000028,read_data,32'h2b2a2928);
-		wb_user_core_read_check(32'h0100002C,read_data,32'h2f2e2d2c);
-		wb_user_core_read_check(32'h01000030,read_data,32'h33323130);
-		wb_user_core_read_check(32'h01000034,read_data,32'h37363534);
-		wb_user_core_read_check(32'h01000038,read_data,32'h3b3a3938);
-		wb_user_core_read_check(32'h0100003C,read_data,32'h3f3e3d3c);
+		data_array[0]   = 32'h03020100;
+		data_array[1]   = 32'h07060504;
+		data_array[2]   = 32'h0b0a0908;
+		data_array[3]   = 32'h0f0e0d0c;
+		data_array[4]   = 32'h13121110;
+		data_array[5]   = 32'h17161514;
+		data_array[6]   = 32'h1b1a1918;
+		data_array[7]   = 32'h1f1e1d1c;
+		data_array[8]   = 32'h23222120;
+		data_array[9]   = 32'h27262524;
+		data_array[10]  = 32'h2b2a2928;
+		data_array[11]  = 32'h2f2e2d2c;
+		data_array[12]  = 32'h33323130;
+		data_array[13]  = 32'h37363534;
+		data_array[14]  = 32'h3b3a3938;
+		data_array[15]  = 32'h3f3e3d3c;
 
-	        /****	
+		wb_user_core_bread_check(32'h01000000,10'h10);
+	        	
 		$display("#############################################");
 		$display("Testing CS[1]                               ");
 		$display("Testing Direct SPI Memory Write              ");
@@ -1156,77 +1291,89 @@ parameter P_QDDR   = 2'b11;
 		wb_user_core_write(`QSPIM_DMEM_CTRL1,{16'h0,1'b0,1'b0,4'b0000,P_MODE_SWITCH_IDLE,P_QUAD,P_QUAD,4'b0001});
 		wb_user_core_write(`QSPIM_DMEM_CTRL2,{8'h04,2'b00,2'b10,P_FSM_CAW,8'h00,8'h02});
 		// WRITE
-		wb_user_core_write(32'h01000000,32'h00112233);
-		wb_user_core_write(32'h01000004,32'h11223344);
-		wb_user_core_write(32'h01000008,32'h22334455);
-		wb_user_core_write(32'h0100000C,32'h33445566);
-		wb_user_core_write(32'h01000010,32'h44556677);
-		wb_user_core_write(32'h01000014,32'h55667788);
-		wb_user_core_write(32'h01000018,32'h66778899);
-		wb_user_core_write(32'h0100001C,32'h778899AA);
-		wb_user_core_write(32'h01000020,32'h8899AABB);
-		wb_user_core_write(32'h01000024,32'h99AABBCC);
-		wb_user_core_write(32'h01000028,32'hAABBCCDD);
-		wb_user_core_write(32'h0100002C,32'hBBCCDDEE);
-		wb_user_core_write(32'h01000030,32'hCCDDEEFF);
-		wb_user_core_write(32'h01000034,32'hDDEEFF00);
-		wb_user_core_write(32'h01000038,32'hEEFF0011);
-		wb_user_core_write(32'h0100003C,32'hFF001122);
-		
-		wb_user_core_write(32'h01000200,32'h12345678);
-		wb_user_core_write(32'h01000204,32'h23456789);
-		wb_user_core_write(32'h01000208,32'h3456789A);
-		wb_user_core_write(32'h0100020C,32'h456789AB);
-		wb_user_core_write(32'h01000210,32'h56789ABC);
-		wb_user_core_write(32'h01000214,32'h6789ABCD);
-		wb_user_core_write(32'h01000218,32'h789ABCDE);
-		wb_user_core_write(32'h0100021C,32'h89ABCDEF);
-		wb_user_core_write(32'h01000220,32'h9ABCDEF0);
-		wb_user_core_write(32'h01000224,32'hABCDEF01);
-		wb_user_core_write(32'h01000228,32'hBCDEF012);
-		wb_user_core_write(32'h0100022C,32'hCDEF0123);
-		wb_user_core_write(32'h01000230,32'hDEF01234);
-		wb_user_core_write(32'h01000234,32'hEF012345);
-		wb_user_core_write(32'h01000238,32'hF0123456);
-		wb_user_core_write(32'h0100023C,32'h01234567);
+		data_array[0]   = 32'h00112233;
+		data_array[1]   = 32'h11223344;
+		data_array[2]   = 32'h22334455;
+		data_array[3]   = 32'h33445566;
+		data_array[4]   = 32'h44556677;
+		data_array[5]   = 32'h55667788;
+		data_array[6]   = 32'h66778899;
+		data_array[7]   = 32'h778899AA;
+		data_array[8]   = 32'h8899AABB;
+		data_array[9]   = 32'h99AABBCC;
+		data_array[10]  = 32'hAABBCCDD;
+		data_array[11]  = 32'hBBCCDDEE;
+		data_array[12]  = 32'hCCDDEEFF;
+		data_array[13]  = 32'hDDEEFF00;
+		data_array[14]  = 32'hEEFF0011;
+		data_array[15]  = 32'hFF001122;
+		wb_user_core_bwrite(32'h01000000,10'h10);
+	
+		wb_user_core_write(`QSPIM_IMEM_CTRL1,{16'h0,1'b0,1'b0,4'b0000,P_MODE_SWITCH_IDLE,P_QUAD,P_QUAD,4'b0010});
+		wb_user_core_write(`QSPIM_IMEM_CTRL2,{8'h1,2'b00,2'b10,P_FSM_C,8'h00,8'h06});
+		wb_user_core_write(`QSPIM_IMEM_WDATA,32'h0);
 
+		wb_user_core_write(`QSPIM_DMEM_CTRL1,{16'h0,1'b0,1'b0,4'b0000,P_MODE_SWITCH_IDLE,P_QUAD,P_QUAD,4'b0001});
+		wb_user_core_write(`QSPIM_DMEM_CTRL2,{8'h04,2'b00,2'b10,P_FSM_CAW,8'h00,8'h02});
+
+		data_array[0]   = 32'h12345678;
+		data_array[1]   = 32'h23456789;
+		data_array[2]   = 32'h3456789A;
+		data_array[3]   = 32'h456789AB;
+		data_array[4]   = 32'h56789ABC;
+		data_array[5]   = 32'h6789ABCD;
+		data_array[6]   = 32'h789ABCDE;
+		data_array[7]   = 32'h89ABCDEF;
+		data_array[8]   = 32'h9ABCDEF0;
+		data_array[9]   = 32'hABCDEF01;
+		data_array[10]  = 32'hBCDEF012;
+		data_array[11]  = 32'hCDEF0123;
+		data_array[12]  = 32'hDEF01234;
+		data_array[13]  = 32'hEF012345;
+		data_array[14]  = 32'hF0123456;
+		data_array[15]  = 32'h01234567;
+		wb_user_core_bwrite(32'h01000200,10'h10);
 		// READ BACK
 		wb_user_core_write(`QSPIM_DMEM_CTRL1,{16'h0,1'b0,1'b0,4'b0000,P_MODE_SWITCH_IDLE,P_QUAD,P_QUAD,4'b0001});
 		wb_user_core_write(`QSPIM_DMEM_CTRL2,{8'h04,2'b00,2'b10,P_FSM_CAMDR,8'h00,8'hEB});
-		wb_user_core_read_check(32'h01000000,read_data,32'h00112233);
-		wb_user_core_read_check(32'h01000004,read_data,32'h11223344);
-		wb_user_core_read_check(32'h01000008,read_data,32'h22334455);
-		wb_user_core_read_check(32'h0100000C,read_data,32'h33445566);
-		wb_user_core_read_check(32'h01000010,read_data,32'h44556677);
-		wb_user_core_read_check(32'h01000014,read_data,32'h55667788);
-		wb_user_core_read_check(32'h01000018,read_data,32'h66778899);
-		wb_user_core_read_check(32'h0100001C,read_data,32'h778899AA);
-		wb_user_core_read_check(32'h01000020,read_data,32'h8899AABB);
-		wb_user_core_read_check(32'h01000024,read_data,32'h99AABBCC);
-		wb_user_core_read_check(32'h01000028,read_data,32'hAABBCCDD);
-		wb_user_core_read_check(32'h0100002C,read_data,32'hBBCCDDEE);
-		wb_user_core_read_check(32'h01000030,read_data,32'hCCDDEEFF);
-		wb_user_core_read_check(32'h01000034,read_data,32'hDDEEFF00);
-		wb_user_core_read_check(32'h01000038,read_data,32'hEEFF0011);
-		wb_user_core_read_check(32'h0100003C,read_data,32'hFF001122);
+		data_array[0]   = 32'h00112233;
+		data_array[1]   = 32'h11223344;
+		data_array[2]   = 32'h22334455;
+		data_array[3]   = 32'h33445566;
+		data_array[4]   = 32'h44556677;
+		data_array[5]   = 32'h55667788;
+		data_array[6]   = 32'h66778899;
+		data_array[7]   = 32'h778899AA;
+		data_array[8]   = 32'h8899AABB;
+		data_array[9]   = 32'h99AABBCC;
+		data_array[10]  = 32'hAABBCCDD;
+		data_array[11]  = 32'hBBCCDDEE;
+		data_array[12]  = 32'hCCDDEEFF;
+		data_array[13]  = 32'hDDEEFF00;
+		data_array[14]  = 32'hEEFF0011;
+		data_array[15]  = 32'hFF001122;
+
+		wb_user_core_bread_check(32'h01000000,10'h10);
+	
+		data_array[0]   = 32'h12345678;
+		data_array[1]   = 32'h23456789;
+		data_array[2]   = 32'h3456789A;
+		data_array[3]   = 32'h456789AB;
+		data_array[4]   = 32'h56789ABC;
+		data_array[5]   = 32'h6789ABCD;
+		data_array[6]   = 32'h789ABCDE;
+		data_array[7]   = 32'h89ABCDEF;
+		data_array[8]   = 32'h9ABCDEF0;
+		data_array[9]   = 32'hABCDEF01;
+		data_array[10]  = 32'hBCDEF012;
+		data_array[11]  = 32'hCDEF0123;
+		data_array[12]  = 32'hDEF01234;
+		data_array[13]  = 32'hEF012345;
+		data_array[14]  = 32'hF0123456;
+		data_array[15]  = 32'h01234567;
 		
-		wb_user_core_read_check(32'h01000200,read_data,32'h12345678);
-		wb_user_core_read_check(32'h01000204,read_data,32'h23456789);
-		wb_user_core_read_check(32'h01000208,read_data,32'h3456789A);
-		wb_user_core_read_check(32'h0100020C,read_data,32'h456789AB);
-		wb_user_core_read_check(32'h01000210,read_data,32'h56789ABC);
-		wb_user_core_read_check(32'h01000214,read_data,32'h6789ABCD);
-		wb_user_core_read_check(32'h01000218,read_data,32'h789ABCDE);
-		wb_user_core_read_check(32'h0100021C,read_data,32'h89ABCDEF);
-		wb_user_core_read_check(32'h01000220,read_data,32'h9ABCDEF0);
-		wb_user_core_read_check(32'h01000224,read_data,32'hABCDEF01);
-		wb_user_core_read_check(32'h01000228,read_data,32'hBCDEF012);
-		wb_user_core_read_check(32'h0100022C,read_data,32'hCDEF0123);
-		wb_user_core_read_check(32'h01000230,read_data,32'hDEF01234);
-		wb_user_core_read_check(32'h01000234,read_data,32'hEF012345);
-		wb_user_core_read_check(32'h01000238,read_data,32'hF0123456);
-		wb_user_core_read_check(32'h0100023C,read_data,32'h01234567);
-		***/
+		wb_user_core_bread_check(32'h01000200,10'h10);
+		**/
 
 		repeat (1000) @(posedge clock);
 			// $display("+1000 cycles");
@@ -1270,9 +1417,12 @@ qspim_top u_top(
     .wbd_we_i    (wbd_ext_we_i),  // write
     .wbd_dat_i   (wbd_ext_dat_i),  // data output
     .wbd_sel_i   (wbd_ext_sel_i),  // byte enable
+    .wbd_bl_i    (wbd_ext_bl_i),            // Busrt Count
+    .wbd_bry_i   (wbd_ext_bry_i),
 
     .wbd_dat_o   (wbd_ext_dat_o),  // data input
     .wbd_ack_o   (wbd_ext_ack_o),  // acknowlegement
+    .wbd_lack_o  (wbd_ext_lack_o),  // Last Ack
 
  
     // IOs
@@ -1365,6 +1515,8 @@ begin
   wbd_ext_we_i  ='h1;  // write
   wbd_ext_dat_i =data;  // data output
   wbd_ext_sel_i ='hF;  // byte enable
+  wbd_ext_bl_i  = 'h1;
+  wbd_ext_bry_i = 1'b1;
   wbd_ext_cyc_i ='h1;  // strobe/request
   wbd_ext_stb_i ='h1;  // strobe/request
   wait(wbd_ext_ack_o == 1);
@@ -1381,6 +1533,40 @@ begin
 end
 endtask
 
+// Burst Write
+task wb_user_core_bwrite;
+input [31:0] address;
+input [11:0] burst;
+reg   [11:0] cnt;
+begin
+   cnt = 0;
+   while(burst != cnt) begin
+      repeat (1) @(posedge clock);
+      #1;
+      wbd_ext_adr_i =address;  // address
+      wbd_ext_we_i  ='h1;      // write
+      wbd_ext_bl_i  =burst;    // Burst Count
+      wbd_ext_bry_i = 1'b1;
+      wbd_ext_dat_i =data_array[cnt];  // data output
+      wbd_ext_sel_i ='hF;  // byte enable
+      wbd_ext_cyc_i ='h1;  // strobe/request
+      wbd_ext_stb_i ='h1;  // strobe/request
+      wait(wbd_ext_ack_o == 1);
+      $display("STATUS: WB USER ACCESS WRITE Address : 0x%x, Data : 0x%x",address+(cnt*4),data_array[cnt]);
+      cnt = cnt + 1;
+  end
+  repeat (1) @(posedge clock);
+  #1;
+  wbd_ext_cyc_i ='h0;  // strobe/request
+  wbd_ext_stb_i ='h0;  // strobe/request
+  wbd_ext_adr_i ='h0;  // address
+  wbd_ext_we_i  ='h0;  // write
+  wbd_ext_dat_i ='h0;  // data output
+  wbd_ext_sel_i ='h0;  // byte enable
+  repeat (2) @(posedge clock);
+end
+endtask
+
 task  wb_user_core_read;
 input [31:0] address;
 output [31:0] data;
@@ -1392,6 +1578,8 @@ begin
   wbd_ext_we_i  ='h0;  // write
   wbd_ext_dat_i ='0;  // data output
   wbd_ext_sel_i ='hF;  // byte enable
+  wbd_ext_bl_i  = 'h1;
+  wbd_ext_bry_i = 1'b1;
   wbd_ext_cyc_i ='h1;  // strobe/request
   wbd_ext_stb_i ='h1;  // strobe/request
   wait(wbd_ext_ack_o == 1);
@@ -1421,6 +1609,8 @@ begin
   wbd_ext_we_i  ='h0;  // write
   wbd_ext_dat_i ='0;  // data output
   wbd_ext_sel_i ='hF;  // byte enable
+  wbd_ext_bl_i  = 'h1;
+  wbd_ext_bry_i = 1'b1;
   wbd_ext_cyc_i ='h1;  // strobe/request
   wbd_ext_stb_i ='h1;  // strobe/request
   wait(wbd_ext_ack_o == 1);
@@ -1443,6 +1633,46 @@ begin
 end
 endtask
 
+// Burst Read Check
+task  wb_user_core_bread_check;
+input [31:0] address;
+input [9:0]  burst;
+reg   [9:0]  cnt;
+reg    [31:0] data;
+begin
+  cnt = 0;
+  while(cnt != burst) begin
+      repeat (1) @(posedge clock);
+      #1;
+      wbd_ext_adr_i =address;  // address
+      wbd_ext_we_i  ='h0;  // write
+      wbd_ext_dat_i ='0;  // data output
+      wbd_ext_sel_i ='hF;  // byte enable
+      wbd_ext_bl_i  =burst;    // Burst Count
+      wbd_ext_bry_i = 1'b1;
+      wbd_ext_cyc_i ='h1;  // strobe/request
+      wbd_ext_stb_i ='h1;  // strobe/request
+      wait(wbd_ext_ack_o == 1);
+      data  = wbd_ext_dat_o;  
+      if(data !== data_array[cnt]) begin
+         $display("ERROR : WB USER ACCESS READ  Address : 0x%x, Exd: 0x%x Rxd: 0x%x ",address+(cnt*4),data_array[cnt],data);
+         tb_top.test_fail = 1;
+      end else begin
+         $display("STATUS: WB USER ACCESS READ  Address : 0x%x, Data : 0x%x",address+(cnt*4),data);
+      end
+      cnt = cnt + 1;
+  end
+  repeat (1) @(posedge clock);
+  #1;
+  wbd_ext_cyc_i ='h0;  // strobe/request
+  wbd_ext_stb_i ='h0;  // strobe/request
+  wbd_ext_adr_i ='h0;  // address
+  wbd_ext_we_i  ='h0;  // write
+  wbd_ext_dat_i ='h0;  // data output
+  wbd_ext_sel_i ='h0;  // byte enable
+  repeat (2) @(posedge clock);
+end
+endtask
 
 
 endmodule

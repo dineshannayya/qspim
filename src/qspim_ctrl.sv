@@ -61,7 +61,7 @@
 ////                                                              ////
 //////////////////////////////////////////////////////////////////////
 module qspim_ctrl  #(
-     parameter CMD_FIFO_WD=36,
+     parameter CMD_FIFO_WD=40,
      parameter ENDIEAN = 0  // 0 - Little, 1 - Big endian, since RISV is Little indian default set 0
      )
 
@@ -236,7 +236,7 @@ parameter P_FSM_CR     = 4'b1100;  // COMMAND -> READ
   logic [1:0]  nxt_cnt;
   logic [1:0]  gnt;
 
-  logic  [7:0] cfg_data_cnt    ;
+  logic  [11:0] cfg_data_cnt    ;
   logic  [3:0] cfg_dummy_cnt   ;
   logic  [1:0] cfg_addr_cnt    ;
   logic  [3:0] cfg_spi_seq     ;
@@ -553,7 +553,7 @@ parameter P_FSM_CR     = 4'b1100;  // COMMAND -> READ
           ctrl_data_mux    = DATA_FIFO;
           ctrl_data_valid  = 1'b1;
           counter_tx_valid = 1'b1;
-          counter_tx       = {5'b0,cfg_data_cnt[7:0],3'b000}; // Convert Byte to Bit Count
+          counter_tx       = {1'b0,cfg_data_cnt[11:0],3'b000}; // Convert Byte to Bit Count
           spi_en_tx        = 1'b1;
 	  if (tx_data_ready) begin
 	      cmd_fifo_rd      = 1'b1;
@@ -587,7 +587,7 @@ parameter P_FSM_CR     = 4'b1100;  // COMMAND -> READ
       FSM_READ_PHASE: begin
           nxt_cnt          = 0;
           counter_rx_valid = 1'b1;
-          counter_rx       = {5'b0,cfg_data_cnt[7:0],3'b000}; // Convert Byte to Bit Count
+          counter_rx       = {1'b0,cfg_data_cnt[11:0],3'b000}; // Convert Byte to Bit Count
           spi_en_rx        = 1'b1;
 	  if(!cmd_fifo_empty) begin
              // If you see new command request, then abort the current request
@@ -652,7 +652,7 @@ end
     end else begin
        if(state == FSM_IDLE) begin
            if(!m0_cmd_fifo_empty) begin
-              cfg_data_cnt    <= m0_cmd_fifo_rdata[33:26];
+              cfg_data_cnt    <= m0_cmd_fifo_rdata[37:26];
               cfg_dummy_cnt   <= m0_cmd_fifo_rdata[25:22];
               cfg_addr_cnt    <= m0_cmd_fifo_rdata[21:20];
               cfg_spi_seq     <= m0_cmd_fifo_rdata[19:16];
@@ -660,7 +660,7 @@ end
               gnt             <= 2'b01;
            end
            else if(!m1_cmd_fifo_empty ) begin
-              cfg_data_cnt    <= m1_cmd_fifo_rdata[33:26];
+              cfg_data_cnt    <= m1_cmd_fifo_rdata[37:26];
               cfg_dummy_cnt   <= m1_cmd_fifo_rdata[25:22];
               cfg_addr_cnt    <= m1_cmd_fifo_rdata[21:20];
               cfg_spi_seq     <= m1_cmd_fifo_rdata[19:16];
