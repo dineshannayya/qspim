@@ -165,6 +165,7 @@ module qspim_top
     logic  [7:0]                  cfg_m0_cs2_amask;
     logic  [7:0]                  cfg_m0_cs3_amask;
     logic                         cfg_m0_fsm_reset ;
+    logic                         cfg_dpft_dis ;
     logic [3:0]                   m0_cs_reg    ;  // Chip select
     logic [1:0]                   cfg_m0_spi_imode ;  // Init SPI Mode 
     logic [1:0]                   cfg_m0_spi_fmode ;  // Final SPI Mode 
@@ -344,6 +345,7 @@ qspim_if #( .WB_WIDTH(WB_WIDTH),.CMD_FIFO_WD(CMD_FIFO_WD)) u_wb_if(
 	.cfg_m0_cs1_amask               (cfg_m0_cs1_amask             ),
 	.cfg_m0_cs2_amask               (cfg_m0_cs2_amask             ),
 	.cfg_m0_cs3_amask               (cfg_m0_cs3_amask             ),
+        .cfg_dpft_dis                   (cfg_dpft_dis                 ),
         .cfg_fsm_reset                  (cfg_m0_fsm_reset             ),
         .cfg_mem_seq                    (cfg_m0_spi_seq               ), // SPI MEM SEQUENCE
         .cfg_addr_cnt                   (cfg_m0_addr_cnt              ), // SPI Addr Count
@@ -405,6 +407,7 @@ qspim_regs
 	.cfg_m0_cs2_amask               (cfg_m0_cs2_amask             ),
 	.cfg_m0_cs3_amask               (cfg_m0_cs3_amask             ),
 
+        .cfg_dpft_dis                   (cfg_dpft_dis                 ),
         .cfg_m0_fsm_reset               (cfg_m0_fsm_reset             ),
         .cfg_m0_spi_imode               (cfg_m0_spi_imode             ), // Init SPI Mode 
         .cfg_m0_spi_fmode               (cfg_m0_spi_fmode             ), // Final SPI Mode 

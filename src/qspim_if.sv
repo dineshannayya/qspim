@@ -97,6 +97,7 @@ module qspim_if #( parameter WB_WIDTH = 32,parameter CMD_FIFO_WD=40) (
     input logic  [7:0]                   cfg_m0_cs2_amask,
     input logic  [7:0]                   cfg_m0_cs3_amask,
 
+    input logic                          cfg_dpft_dis,   // Direct Mem Prefetch enable/disable
     input logic                          cfg_fsm_reset,
     input logic [3:0]                    cfg_mem_seq,    // SPI MEM SEQUENCE
     input logic [1:0]                    cfg_addr_cnt,   // SPI Addr Count
@@ -283,7 +284,8 @@ begin
 	// Check If any prefetch data available and if see it matched with WB
 	// address, If yes, the move to data reading from response fifo, else 
 	// generate command request
-	if(spim_mem_req && !wbd_we_i && NextPreDVal && (wbd_adr_i == NextPreAddr)) begin
+	if(spim_mem_req && !wbd_we_i && NextPreDVal && (wbd_adr_i == NextPreAddr) && !cfg_dpft_dis) begin
+	  next_wbd_bl_cnt = wbd_bl_i;
           next_state = READ_DATA;
 	end else if(spim_mem_req && cmd_fifo_empty) begin
 	   cmd_fifo_wdata = {SOC,NOC,{wbd_bl_i[9:0],2'b0},cfg_dummy_cnt[3:0],cfg_addr_cnt[1:0],cfg_mem_seq[3:0],cfg_mode_reg[7:0],cfg_cmd_reg[7:0]};
