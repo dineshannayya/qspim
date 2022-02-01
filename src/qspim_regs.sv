@@ -321,30 +321,25 @@ logic                 spim_fifo_wdata_req  ;
 assign spim_fifo_rdata_req = spim_reg_req && spim_reg_we == 0 && (spim_reg_addr== IMEM_RDATA);
 assign spim_fifo_wdata_req = spim_reg_req && spim_reg_we == 1 && (spim_reg_addr== IMEM_WDATA);
 
-always_ff @(negedge rst_n or posedge mclk) begin
-   if ( rst_n == 1'b0 ) begin
-       spim_reg_ack  <= 1'b0;
-       spim_reg_rdata <= 'h0;
-   end else begin
-      if(spi_init_done && spim_reg_ack == 0) begin
-         if (spim_fifo_wdata_req && (spim_m1_wrdy == 1)) begin // Indirect Memory Write
-	     // If FIFO Write DATA case, Make sure that there no previous pending
-	     // need to processed
-             spim_reg_ack  <= 1'b1;
-	 end else if (spim_reg_req && spim_reg_we && (spim_reg_addr != IMEM_WDATA)) begin // Indirect memory Write
-             spim_reg_ack  <= 1'b1;
-	 end else if (spim_fifo_rdata_req && (spim_m1_rrdy == 1)) begin // Indirect mem Read
-	     // If FIFO Read DATA case, Make sure that there Data is read from
-             // External SPI Memory
-             spim_reg_ack  <= 1'b1;
-             spim_reg_rdata <= reg_rdata;
-	end else if (spim_reg_req && spim_reg_we == 0 && (spim_reg_addr != IMEM_RDATA)) begin // Normal Read
+always_comb  begin
+   spim_reg_ack   = 1'b0;
+   spim_reg_rdata = 'h0;
+   if(spi_init_done) begin
+      if (spim_fifo_wdata_req && (spim_m1_wrdy == 1)) begin // Indirect Memory Write
+	 // If FIFO Write DATA case, Make sure that there no previous pending
+	 // need to processed
+         spim_reg_ack  = 1'b1;
+      end else if (spim_reg_req && spim_reg_we && (spim_reg_addr != IMEM_WDATA)) begin // Indirect memory Write
+         spim_reg_ack  = 1'b1;
+      end else if (spim_fifo_rdata_req && (spim_m1_rrdy == 1)) begin // Indirect mem Read
+	 // If FIFO Read DATA case, Make sure that there Data is read from
+         // External SPI Memory
+         spim_reg_ack   = 1'b1;
+         spim_reg_rdata = reg_rdata;
+      end else if (spim_reg_req && spim_reg_we == 0 && (spim_reg_addr != IMEM_RDATA)) begin // Normal Read
 	     // Read other than FIFO Read Data case
-             spim_reg_ack  <= 1'b1;
-             spim_reg_rdata <= reg_rdata;
-	end
-      end else begin
-         spim_reg_ack <= 1'b0;
+          spim_reg_ack   = 1'b1;
+          spim_reg_rdata = reg_rdata;
       end
    end
 end

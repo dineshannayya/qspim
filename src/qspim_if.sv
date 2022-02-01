@@ -159,7 +159,6 @@ logic                 spim_wb_we     ;
 logic [3:0]           spim_wb_be     ;
 logic [WB_WIDTH-1:0]  spi_mem_rdata  ;
 logic [WB_WIDTH-1:0]  spim_wb_rdata  ;
-logic                 wbd_stb_d      ;
 logic                 wbd_stb_l      ;
 
 logic [9:0]           wbd_bl_cnt     ;
@@ -182,25 +181,38 @@ logic [31:0]	      NextPreAddr    ;
   // will be done inside the wishbone inter-connect 
   // --------------------------------------------------------------
 
-  assign spim_mem_req = ((wbd_stb_i) && wbd_adr_i[28] == 1'b0);
+  assign spim_mem_req = (wbd_stb_i && !wbd_lack_o && (wbd_adr_i[28] == 1'b0));
 
   // Generate Once cycle delayed wbd_stb_l
-  assign spim_reg_req = ((wbd_stb_d) && spim_wb_addr[28] == 1'b1);
+  assign spim_reg_req = (wbd_stb_i && !wbd_lack_o && (wbd_adr_i[28] == 1'b1)) ;
 
-  assign spim_reg_addr  = spim_wb_addr[5:2];
-  assign spim_reg_wdata = spim_wb_wdata;
-  assign spim_reg_we    = spim_wb_we;
-  assign spim_reg_be    = spim_wb_be;
+  assign spim_reg_addr  = wbd_adr_i[5:2];
+  assign spim_reg_wdata = wbd_dat_i;
+  assign spim_reg_we    = wbd_we_i;
+  assign spim_reg_be    = wbd_sel_i;
+        
+  
+  wire wbd_ack  =     (spim_mem_req) ? spim_mem_ack : 
+	              (spim_reg_req) ? spim_reg_ack : 1'b0;
 
-  assign wbd_dat_o  =  (spim_mem_req && !wbd_we_i) ? spi_mem_rdata :
-	               (spim_reg_req && !wbd_we_i ) ? spim_reg_rdata: 'h0;
-  assign wbd_err_o  =  1'b0;
+always_ff @(negedge rst_n or posedge mclk) begin
+    if ( rst_n == 1'b0 ) begin
+       wbd_dat_o  <=  'h0;
+       wbd_err_o  <=  1'b0;
+       wbd_ack_o  <=  'b0;
+       wbd_lack_o  <=  'b0;
+    end else begin
+        wbd_dat_o  <=  (spim_mem_req && !wbd_we_i && wbd_ack ) ? spi_mem_rdata :
+	               (spim_reg_req && !wbd_we_i && wbd_ack ) ? spim_reg_rdata: 'h0;
+        wbd_err_o  <=  1'b0;
 
-  assign wbd_ack_o  =  (spim_mem_req) ? spim_mem_ack : 
-	               (spim_reg_req) ? spim_reg_ack : 1'b0;
+        wbd_ack_o  <=  (spim_mem_req) ? spim_mem_ack : 
+	              (spim_reg_req) ? spim_reg_ack : 1'b0;
 
-  assign wbd_lack_o   = (spim_mem_req) ? ((wbd_bl_i == 'h1) ? spim_mem_ack : (wbd_bl_cnt == 'h2) &  spim_mem_ack) :
+       wbd_lack_o  <= (spim_mem_req) ? ((wbd_bl_i == 'h1) ? spim_mem_ack : (wbd_bl_cnt == 'h1) &  spim_mem_ack) :
 	                ((spim_reg_req) ? spim_reg_ack : 1'b0);
+  end
+end
 
 
   // Detect Pos Edge of strobe
@@ -218,11 +230,10 @@ always_ff @(negedge rst_n or posedge mclk) begin
    end else begin
 	if(spi_init_done) begin // Wait for internal SPI Init Done
 	    wbd_stb_l     <= wbd_stb_i;
-	    wbd_stb_d     <= wbd_stb_i & !wbd_ack_o;
       	    wbd_bl_cnt   <= next_wbd_bl_cnt;
 	    if(wbd_stb_pedge) begin
 	       spim_wb_addr <= wbd_adr_i;
-            end else if(wbd_ack_o) begin
+            end else if(spim_mem_ack) begin
                spim_wb_addr <= spim_wb_addr+4;
 	    end
 
