@@ -82,6 +82,7 @@
 //`include "spiflash.v"
 `include "s25fl256s.sv"
 `include "cy15b104qs.v"
+`include "spiram.v"
 `ifdef GL
      //`define USE_POWER_PINS
      `define UNIT_DELAY #0.1
@@ -112,19 +113,21 @@
  `endif
 
  // REGISTER MAP
- `define QSPIM_GLBL_CTRL     32'h10000000
- `define QSPIM_DMEM_CTRL1    32'h10000004
- `define QSPIM_DMEM_CTRL2    32'h10000008
+ `define QSPIM_GLBL_CTRL           32'h10000000
+ `define QSPIM_DMEM_G0_RD_CTRL    32'h10000004
+ `define QSPIM_DMEM_G0_WR_CTRL    32'h10000008
+ `define QSPIM_DMEM_G1_RD_CTRL    32'h1000000C
+ `define QSPIM_DMEM_G1_WR_CTRL    32'h10000010
 
- `define QSPIM_DMEM_CS_AMAP  32'h1000000C
- `define QSPIM_DMEM_CA_AMASK 32'h10000010
+ `define QSPIM_DMEM_CS_AMAP        32'h10000014
+ `define QSPIM_DMEM_CA_AMASK       32'h10000018
 
- `define QSPIM_IMEM_CTRL1    32'h10000014
- `define QSPIM_IMEM_CTRL2    32'h10000018
- `define QSPIM_IMEM_ADDR     32'h1000001C
- `define QSPIM_IMEM_WDATA    32'h10000020
- `define QSPIM_IMEM_RDATA    32'h10000024
- `define QSPIM_SPI_STATUS    32'h10000028
+ `define QSPIM_IMEM_CTRL1          32'h1000001C
+ `define QSPIM_IMEM_CTRL2          32'h10000020
+ `define QSPIM_IMEM_ADDR           32'h10000024
+ `define QSPIM_IMEM_WDATA          32'h10000028
+ `define QSPIM_IMEM_RDATA          32'h1000002C
+ `define QSPIM_SPI_STATUS          32'h10000030
 
 module tb_top;
 /*************************************************************
@@ -251,6 +254,140 @@ parameter P_QDDR   = 2'b11;
 		wb_rst_i = 1'b0;	    	// Release reset
 
 	        repeat (200) @(posedge clock);
+		// CS#2 SSPI Indirect RAM READ ACCESS-
+		wb_user_core_write(`QSPIM_IMEM_CTRL1,{16'h0,1'b0,1'b0,4'b0000,P_MODE_SWITCH_IDLE,P_SINGLE,P_SINGLE,4'b0100});
+		wb_user_core_write(`QSPIM_IMEM_CTRL2,{8'h4,2'b00,2'b10,P_FSM_CADR,8'h00,8'h03});
+		wb_user_core_write(`QSPIM_IMEM_ADDR,32'h00000000);
+		wb_user_core_read_check(`QSPIM_IMEM_RDATA,read_data,32'h03020100);
+		wb_user_core_write(`QSPIM_IMEM_ADDR,32'h00000004);
+		wb_user_core_read_check(`QSPIM_IMEM_RDATA,read_data,32'h07060504);
+		wb_user_core_write(`QSPIM_IMEM_ADDR,32'h00000008);
+		wb_user_core_read_check(`QSPIM_IMEM_RDATA,read_data,32'h0b0a0908);
+		wb_user_core_write(`QSPIM_IMEM_ADDR,32'h0000000C);
+		wb_user_core_read_check(`QSPIM_IMEM_RDATA,read_data,32'h0f0e0d0c);
+
+		wb_user_core_write(`QSPIM_IMEM_ADDR,32'h00000200);
+		wb_user_core_read_check(`QSPIM_IMEM_RDATA,read_data,32'h11111111);
+		wb_user_core_write(`QSPIM_IMEM_ADDR,32'h00000204);
+		wb_user_core_read_check(`QSPIM_IMEM_RDATA,read_data,32'h22222222);
+		wb_user_core_write(`QSPIM_IMEM_ADDR,32'h00000208);
+		wb_user_core_read_check(`QSPIM_IMEM_RDATA,read_data,32'h33333333);
+		wb_user_core_write(`QSPIM_IMEM_ADDR,32'h0000020C);
+		wb_user_core_read_check(`QSPIM_IMEM_RDATA,read_data,32'h44444444);
+
+		// CS#2 SSPI Indiect Write DATA
+		wb_user_core_write(`QSPIM_IMEM_CTRL1,{16'h0,1'b0,1'b0,4'b0000,P_MODE_SWITCH_IDLE,P_SINGLE,P_SINGLE,4'b0100});
+		wb_user_core_write(`QSPIM_IMEM_CTRL2,{8'h10,2'b00,2'b10,P_FSM_CAW,8'h00,8'h02});
+		wb_user_core_write(`QSPIM_IMEM_ADDR,32'h00000000);
+		wb_user_core_write(`QSPIM_IMEM_WDATA,32'h00112233);
+		wb_user_core_write(`QSPIM_IMEM_WDATA,32'h44556677);
+		wb_user_core_write(`QSPIM_IMEM_WDATA,32'h8899AABB);
+		wb_user_core_write(`QSPIM_IMEM_WDATA,32'hCCDDEEFF);
+		
+		// CS#2 SSPI Indirect READ DATA
+		wb_user_core_write(`QSPIM_IMEM_CTRL1,{16'h0,1'b0,1'b0,4'b0000,P_MODE_SWITCH_IDLE,P_SINGLE,P_SINGLE,4'b0100});
+		wb_user_core_write(`QSPIM_IMEM_CTRL2,{8'h10,2'b00,2'b10,P_FSM_CADR,8'h00,8'h03});
+		wb_user_core_write(`QSPIM_IMEM_ADDR,32'h00000000);
+		wb_user_core_read_check(`QSPIM_IMEM_RDATA,read_data,32'h00112233);
+		wb_user_core_read_check(`QSPIM_IMEM_RDATA,read_data,32'h44556677);
+		wb_user_core_read_check(`QSPIM_IMEM_RDATA,read_data,32'h8899AABB);
+		wb_user_core_read_check(`QSPIM_IMEM_RDATA,read_data,32'hCCDDEEFF);
+
+
+		// CS#2 Switch to QSPI Mode
+		wb_user_core_write(`QSPIM_IMEM_CTRL1,{16'h0,1'b0,1'b0,4'b0000,P_MODE_SWITCH_IDLE,P_SINGLE,P_SINGLE,4'b0100});
+		wb_user_core_write(`QSPIM_IMEM_CTRL2,{8'h0,2'b00,2'b00,P_FSM_C,8'h00,8'h38});
+		wb_user_core_write(`QSPIM_IMEM_WDATA,32'h0);
+
+
+		// CS#2 QUAD Indirect Write DATA
+		wb_user_core_write(`QSPIM_IMEM_CTRL1,{16'h0,1'b0,1'b0,4'b0000,P_MODE_SWITCH_IDLE,P_QUAD,P_QUAD,4'b0100});
+		wb_user_core_write(`QSPIM_IMEM_CTRL2,{8'h10,2'b00,2'b10,P_FSM_CAW,8'h00,8'h02});
+		wb_user_core_write(`QSPIM_IMEM_ADDR,32'h00000000);
+		wb_user_core_write(`QSPIM_IMEM_WDATA,32'h01234557);
+		wb_user_core_write(`QSPIM_IMEM_WDATA,32'h89ABCDEF);
+		wb_user_core_write(`QSPIM_IMEM_WDATA,32'h12345678);
+		wb_user_core_write(`QSPIM_IMEM_WDATA,32'h9ABCDEF0);
+
+
+		// CS#2 QUAD Indirect READ DATA
+		wb_user_core_write(`QSPIM_IMEM_CTRL1,{16'h0,1'b0,1'b0,4'b0000,P_MODE_SWITCH_IDLE,P_QUAD,P_QUAD,4'b0100});
+		wb_user_core_write(`QSPIM_IMEM_CTRL2,{8'h10,2'b00,2'b10,P_FSM_CADR,8'h00,8'h03});
+		wb_user_core_write(`QSPIM_IMEM_ADDR,32'h00000000);
+		wb_user_core_read_check(`QSPIM_IMEM_RDATA,read_data,32'h01234557);
+		wb_user_core_read_check(`QSPIM_IMEM_RDATA,read_data,32'h89ABCDEF);
+		wb_user_core_read_check(`QSPIM_IMEM_RDATA,read_data,32'h12345678);
+		wb_user_core_read_check(`QSPIM_IMEM_RDATA,read_data,32'h9ABCDEF0);
+
+		// CS#2 Switch From QSPI to SSPI Mode
+		wb_user_core_write(`QSPIM_IMEM_CTRL1,{16'h0,1'b0,1'b0,4'b0000,P_MODE_SWITCH_IDLE,P_QUAD,P_QUAD,4'b0100});
+		wb_user_core_write(`QSPIM_IMEM_CTRL2,{8'h0,2'b00,2'b00,P_FSM_C,8'h00,8'hFF});
+		wb_user_core_write(`QSPIM_IMEM_WDATA,32'h0);
+		///////////////////// End of CS#1 Indirect Memory Access Testing ///////////////////////////////////
+		
+		$display("#############################################");
+		$display("  Page Read through Direct Burst Access in SSPI Mode       ");
+		$display("#############################################");
+		wb_user_core_write(`QSPIM_DMEM_G1_WR_CTRL,{P_FSM_CAW, 4'b0000,2'b10,P_MODE_SWITCH_IDLE,P_SINGLE,P_SINGLE,8'h00,8'h02});
+		wb_user_core_write(`QSPIM_DMEM_G1_RD_CTRL,{P_FSM_CADR,4'b0000,2'b10,P_MODE_SWITCH_IDLE,P_SINGLE,P_SINGLE,8'h00,8'h03});
+
+		data_array[10'h0]    = 32'h01234557;
+		data_array[10'h1]    = 32'h89ABCDEF;
+		data_array[10'h2]    = 32'h12345678;
+		data_array[10'h3]    = 32'h9ABCDEF0;
+		wb_user_core_bread_check(32'h08000000,10'h4);
+
+		data_array[10'h0]    = 32'h00112233;
+		data_array[10'h1]    = 32'h44556677;
+		data_array[10'h2]    = 32'h8899AABB;
+		data_array[10'h3]    = 32'hCCDDEEFF;
+		data_array[10'h4]    = 32'h00001111;
+		data_array[10'h5]    = 32'h22223333;
+		data_array[10'h6]    = 32'h44445555;
+		data_array[10'h7]    = 32'h66667777;
+		wb_user_core_bwrite(32'h08000000,10'h8);
+		wb_user_core_bread_check(32'h08000000,10'h8);
+
+		$display("#############################################");
+		$display("  Page Read through Direct Burst Access in QSPI Mode       ");
+		$display("#############################################");
+		// CS#1 Switch to QSPI Mode
+		wb_user_core_write(`QSPIM_IMEM_CTRL1,{16'h0,1'b0,1'b0,4'b0000,P_MODE_SWITCH_IDLE,P_SINGLE,P_SINGLE,4'b0100});
+		wb_user_core_write(`QSPIM_IMEM_CTRL2,{8'h0,2'b00,2'b00,P_FSM_C,8'h00,8'h38});
+		wb_user_core_write(`QSPIM_IMEM_WDATA,32'h0);
+		wb_user_core_write(`QSPIM_DMEM_G1_WR_CTRL,{P_FSM_CAW,4'b0000,2'b10,P_MODE_SWITCH_IDLE,P_QUAD,P_QUAD,8'h00,8'h02});
+		wb_user_core_write(`QSPIM_DMEM_G1_RD_CTRL,{P_FSM_CADR,4'b0000,2'b10,P_MODE_SWITCH_IDLE,P_QUAD,P_QUAD,8'h00,8'h03});
+
+		data_array[10'h0]    = 32'h00112233;
+		data_array[10'h1]    = 32'h44556677;
+		data_array[10'h2]    = 32'h8899AABB;
+		data_array[10'h3]    = 32'hCCDDEEFF;
+		data_array[10'h4]    = 32'h00001111;
+		data_array[10'h5]    = 32'h22223333;
+		data_array[10'h6]    = 32'h44445555;
+		data_array[10'h7]    = 32'h66667777;
+		wb_user_core_bwrite(32'h08000000,10'h8);
+		wb_user_core_bread_check(32'h08000000,10'h8);
+		
+		data_array[10'h000]    = 32'h01234557;
+		data_array[10'h001]    = 32'h89ABCDEF;
+		data_array[10'h002]    = 32'h12345678;
+		data_array[10'h003]    = 32'h9ABCDEF0;
+		data_array[10'h004]    = 32'h23456789;
+		data_array[10'h005]    = 32'hABCDEF01;
+		data_array[10'h006]    = 32'h3456789A;
+		data_array[10'h007]    = 32'hBCDEF012;
+		wb_user_core_bwrite(32'h08000200,10'h8);
+		wb_user_core_bread_check(32'h08000200,10'h8);
+
+		// CS#1 Switch From QSPI to SSPI Mode
+		wb_user_core_write(`QSPIM_IMEM_CTRL1,{16'h0,1'b0,1'b0,4'b0000,P_MODE_SWITCH_IDLE,P_QUAD,P_QUAD,4'b0100});
+		wb_user_core_write(`QSPIM_IMEM_CTRL2,{8'h0,2'b00,2'b00,P_FSM_C,8'h00,8'hFF});
+		wb_user_core_write(`QSPIM_IMEM_WDATA,32'h0);
+
+
+		///////////////////// End of CS#1 Testing ///////////////////////////////////
+
 
 		$display("#############################################");
 		$display("  Read Identification (RDID:0x9F)            ");
@@ -265,8 +402,7 @@ parameter P_QDDR   = 2'b11;
 		$display("SEQ: Command -> Address -> Read Data        ");
 		$display("#############################################");
 		// QDDR Config
-		wb_user_core_write(`QSPIM_DMEM_CTRL1,{16'h0,1'b0,1'b0,4'b0100,P_MODE_SWITCH_AT_ADDR,P_QDDR,P_SINGLE,4'b0001});
-		wb_user_core_write(`QSPIM_DMEM_CTRL2,{8'h04,2'b00,2'b10,P_FSM_CAMDR,8'h00,8'hED});
+		wb_user_core_write(`QSPIM_DMEM_G0_RD_CTRL,{P_FSM_CAMDR,4'b0100,2'b10,P_MODE_SWITCH_AT_ADDR,P_QDDR,P_SINGLE,8'h00,8'hED});
 		wb_user_core_read_check(32'h00000200,read_data,32'h00000093);
 		wb_user_core_read_check(32'h00000204,read_data,32'h00000113);
 		wb_user_core_read_check(32'h00000208,read_data,32'h00000193);
@@ -289,8 +425,7 @@ parameter P_QDDR   = 2'b11;
 		$display("Prefetch : 1DW, OPCODE:READ(0x3)            ");
 		$display("SEQ: Command -> Address -> Read Data        ");
 		$display("#############################################");
-		wb_user_core_write(`QSPIM_DMEM_CTRL1,{16'h0,1'b0,1'b0,4'b0000,P_MODE_SWITCH_IDLE,P_SINGLE,P_SINGLE,4'b0001});
-		wb_user_core_write(`QSPIM_DMEM_CTRL2,{8'h04,2'b00,2'b10,P_FSM_CAR,8'h00,8'h03});
+		wb_user_core_write(`QSPIM_DMEM_G0_RD_CTRL,{P_FSM_CAR,4'b0000,2'b10,P_MODE_SWITCH_IDLE,P_SINGLE,P_SINGLE,8'h00,8'h03});
 		wb_user_core_read_check(32'h00000200,read_data,32'h00000093);
 		wb_user_core_read_check(32'h00000204,read_data,32'h00000113);
 		wb_user_core_read_check(32'h00000208,read_data,32'h00000193);
@@ -313,8 +448,7 @@ parameter P_QDDR   = 2'b11;
 		$display("Prefetch : 1DW, OPCODE:FASTREAD(0xB)        ");
 		$display("SEQ: Command -> Address -> Dummy -> Read Data");
 		$display("#############################################");
-		wb_user_core_write(`QSPIM_DMEM_CTRL1,{16'h0,1'b0,1'b0,4'b0000,P_MODE_SWITCH_IDLE,P_SINGLE,P_SINGLE,4'b0001});
-		wb_user_core_write(`QSPIM_DMEM_CTRL2,{8'h04,2'b00,2'b10,P_FSM_CADR,8'h00,8'h0B});
+		wb_user_core_write(`QSPIM_DMEM_G0_RD_CTRL,{P_FSM_CADR,4'b0000,2'b10,P_MODE_SWITCH_IDLE,P_SINGLE,P_SINGLE,8'h00,8'h0B});
 		wb_user_core_read_check(32'h00000200,read_data,32'h00000093);
 		wb_user_core_read_check(32'h00000204,read_data,32'h00000113);
 		wb_user_core_read_check(32'h00000208,read_data,32'h00000193);
@@ -338,8 +472,7 @@ parameter P_QDDR   = 2'b11;
 		$display("Prefetch : 1DW, OPCODE:DOR(0x3B)        ");
 		$display("SEQ: Command -> Address -> Dummy -> Read Data");
 		$display("#############################################");
-		wb_user_core_write(`QSPIM_DMEM_CTRL1,{16'h0,1'b0,1'b0,4'b0000,P_MODE_SWITCH_AT_DATA,P_DOUBLE,P_SINGLE,4'b0001});
-		wb_user_core_write(`QSPIM_DMEM_CTRL2,{8'h04,2'b00,2'b10,P_FSM_CADR,8'h00,8'h3B});
+		wb_user_core_write(`QSPIM_DMEM_G0_RD_CTRL,{P_FSM_CADR,4'b0000,2'b10,P_MODE_SWITCH_AT_DATA,P_DOUBLE,P_SINGLE,8'h00,8'h3B});
 		wb_user_core_read_check(32'h00000200,read_data,32'h00000093);
 		wb_user_core_read_check(32'h00000204,read_data,32'h00000113);
 		wb_user_core_read_check(32'h00000208,read_data,32'h00000193);
@@ -363,8 +496,7 @@ parameter P_QDDR   = 2'b11;
 		$display("Prefetch : 8DW, OPCODE:URAD READ(0xEB)      ");
 		$display("SEQ: Command -> Address -> Dummy -> Read Data");
 		$display("#############################################");
-		wb_user_core_write(`QSPIM_DMEM_CTRL1,{16'h0,1'b0,1'b0,4'b0001,P_MODE_SWITCH_AT_ADDR,P_QUAD,P_SINGLE,4'b0001});
-		wb_user_core_write(`QSPIM_DMEM_CTRL2,{8'h20,2'b00,2'b10,P_FSM_CAMDR,8'h00,8'hEB});
+		wb_user_core_write(`QSPIM_DMEM_G0_RD_CTRL,{P_FSM_CAMDR,4'b0001,2'b10,P_MODE_SWITCH_AT_ADDR,P_QUAD,P_SINGLE,8'h00,8'hEB});
 		wb_user_core_read_check(32'h00000200,read_data,32'h00000093);
 		wb_user_core_read_check(32'h00000204,read_data,32'h00000113);
 		wb_user_core_read_check(32'h00000208,read_data,32'h00000193);
@@ -385,8 +517,7 @@ parameter P_QDDR   = 2'b11;
 		$display("#############################################");
 		$display("Testing Direct SPI Memory Read with Prefetch:3DW");
 		$display("#############################################");
-		wb_user_core_write(`QSPIM_DMEM_CTRL1,{16'h0,1'b0,1'b0,4'b0001,P_MODE_SWITCH_AT_ADDR,P_QUAD,P_SINGLE,4'b0001});
-		wb_user_core_write(`QSPIM_DMEM_CTRL2,{8'hC,2'b00,2'b10,P_FSM_CAMDR,8'h00,8'hEB});
+		wb_user_core_write(`QSPIM_DMEM_G0_RD_CTRL,{P_FSM_CAMDR,4'b0001,2'b10,P_MODE_SWITCH_AT_ADDR,P_QUAD,P_SINGLE,8'h00,8'hEB});
 		wb_user_core_read_check(32'h00000200,read_data,32'h00000093);
 		wb_user_core_read_check(32'h00000204,read_data,32'h00000113);
 		wb_user_core_read_check(32'h00000208,read_data,32'h00000193);
@@ -407,8 +538,7 @@ parameter P_QDDR   = 2'b11;
 		$display("#############################################");
 		$display("Testing Direct SPI Memory Read with Prefetch:2DW");
 		$display("#############################################");
-		wb_user_core_write(`QSPIM_DMEM_CTRL1,{16'h0,1'b0,1'b0,4'b0001,P_MODE_SWITCH_AT_ADDR,P_QUAD,P_SINGLE,4'b0001});
-		wb_user_core_write(`QSPIM_DMEM_CTRL2,{8'h8,2'b00,2'b10,P_FSM_CAMDR,8'h00,8'hEB});
+		wb_user_core_write(`QSPIM_DMEM_G0_RD_CTRL,{P_FSM_CAMDR,4'b0001,2'b10,P_MODE_SWITCH_AT_ADDR,P_QUAD,P_SINGLE,8'h00,8'hEB});
 		wb_user_core_read_check(32'h00000200,read_data,32'h00000093);
 		wb_user_core_read_check(32'h00000204,read_data,32'h00000113);
 		wb_user_core_read_check(32'h00000208,read_data,32'h00000193);
@@ -430,8 +560,7 @@ parameter P_QDDR   = 2'b11;
 		$display("#############################################");
 		$display("Testing Direct SPI Memory Read with Prefetch:1DW");
 		$display("#############################################");
-		wb_user_core_write(`QSPIM_DMEM_CTRL1,{16'h0,1'b0,1'b0,4'b0001,P_MODE_SWITCH_AT_ADDR,P_QUAD,P_SINGLE,4'b0001});
-		wb_user_core_write(`QSPIM_DMEM_CTRL2,{8'h4,2'b00,2'b10,P_FSM_CAMDR,8'h00,8'hEB});
+		wb_user_core_write(`QSPIM_DMEM_G0_RD_CTRL,{P_FSM_CAMDR,4'b0001,2'b10,P_MODE_SWITCH_AT_ADDR,P_QUAD,P_SINGLE,8'h00,8'hEB});
 		wb_user_core_read_check(32'h00000200,read_data,32'h00000093);
 		wb_user_core_read_check(32'h00000204,read_data,32'h00000113);
 		wb_user_core_read_check(32'h00000208,read_data,32'h00000193);
@@ -452,8 +581,7 @@ parameter P_QDDR   = 2'b11;
 		$display("#############################################");
 		$display("Testing Direct SPI Memory Read with Prefetch:7DW");
 		$display("#############################################");
-		wb_user_core_write(`QSPIM_DMEM_CTRL1,{16'h0,1'b0,1'b0,4'b0001,P_MODE_SWITCH_AT_ADDR,P_QUAD,P_SINGLE,4'b0001});
-		wb_user_core_write(`QSPIM_DMEM_CTRL2,{8'h1C,2'b00,2'b10,P_FSM_CAMDR,8'h00,8'hEB});
+		wb_user_core_write(`QSPIM_DMEM_G0_RD_CTRL,{P_FSM_CAMDR,4'b0001,2'b10,P_MODE_SWITCH_AT_ADDR,P_QUAD,P_SINGLE,8'h00,8'hEB});
 		wb_user_core_read_check(32'h00000200,read_data,32'h00000093);
 		wb_user_core_read_check(32'h00000204,read_data,32'h00000113);
 		wb_user_core_read_check(32'h00000208,read_data,32'h00000193);
@@ -1210,6 +1338,8 @@ parameter P_QDDR   = 2'b11;
 		data_array[10'h1A]   = 32'h00020058;
 		data_array[10'h1B]   = 32'h00020059;
 		wb_user_core_bread_check(32'h00000280,10'h1C);
+
+
 	        /**
 		//-----------------------------------------------------------------
 		//  FRAM TESTING SEQUENCE START HERE
@@ -1489,18 +1619,16 @@ qspim_top u_top(
        
        );
 
-   cy15b104qs #(.mem_file_name("flash1.hex"),
-	         .otp_file_name("none"),
-		 .TimingModel("CY15B104QSN-108SXI"))
+   spiram #(.mem_file_name("flash1.hex"))
 	u_sfram (
          // Data Inputs/Outputs
-           .SI      (flash_io0),
-           .SO      (flash_io1),
+           .io0     (flash_io0),
+           .io1     (flash_io1),
            // Controls
-           .SCK     (flash_clk),
-           .CSNeg   (spi_csb[1]),
-           .WPNeg   (flash_io2),
-           .RESETNeg(flash_io3)
+           .clk    (flash_clk),
+           .csb    (spi_csb[2]),
+           .io2    (flash_io2),
+           .io3    (flash_io3)
     );
 
 

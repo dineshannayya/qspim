@@ -43,6 +43,11 @@
 ////           count is withing 8DW, less Read path can hang due  ////
 ////           to response FIFO full from one master port         ////
 ////                                                              ////
+////      Assumed Default Direct Address CS Mapping               ////
+////      0x0000_0000 to 0x03FF_FFFF - CS-0 (64MB)                ////
+////      0x0400_0000 to 0x07FF_FFFF - CS-1 (64MB)                ////
+////      0x0800_0000 to 0x0BFF_FFFF - CS-2 (64MB)                ////
+////      0x0C00_0000 to 0x0FFF_FFFF - CS-3 (64MB)                ////
 ////  To Do:                                                      ////
 ////    1. Add support for WishBone request timout                ////
 ////    2. Add Pre-fetch feature for M0 Port                      ////
@@ -81,7 +86,10 @@
 ////                *_imode loaded at init place of CS Assertion  ////
 ////                & *_fmode loaded on switching place           //// 
 ////     1.0  - Jan 25, 2022, Dinesh A                            ////
-////             Direct memory Burst Mode support is added        ///
+////             Direct memory Burst Mode support is added        ////
+////     1.1  - Feb 7, 2022, Dinesh A                             ////
+////             CS0/CS1 will have Config support for FLASH SPI   ////
+////             CS2/CS3 will have config support SRAM SPI        ////
 ////                                                              ////
 //////////////////////////////////////////////////////////////////////
 ////                                                              ////
@@ -114,7 +122,7 @@
 
 module qspim_top
 #( parameter WB_WIDTH = 32,
-   parameter CMD_FIFO_WD = 40)
+   parameter CMD_FIFO_WD = 50)
 (
 `ifdef USE_POWER_PINS
          input logic            vccd1,    // User area 1 1.8V supply
@@ -166,21 +174,42 @@ module qspim_top
     logic  [7:0]                  cfg_m0_cs3_amask;
     logic                         cfg_m0_fsm_reset ;
     logic                         cfg_dpft_dis ;
-    logic [3:0]                   m0_cs_reg    ;  // Chip select
-    logic [1:0]                   cfg_m0_spi_imode ;  // Init SPI Mode 
-    logic [1:0]                   cfg_m0_spi_fmode ;  // Final SPI Mode 
-    logic [1:0]                   cfg_m0_spi_switch;  // SPI Mode Switching Place
-    logic [3:0]                   cfg_m0_spi_seq   ;  // SPI SEQUENCE
-    logic [1:0]                   cfg_m0_addr_cnt  ;  // SPI Addr Count
-    logic [3:0]                   cfg_m0_dummy_cnt ;  // SPI Dummy Count
-    logic [7:0]                   cfg_m0_data_cnt  ;  // SPI Read Count
-    logic [7:0]                   cfg_m0_cmd_reg   ;  // SPI MEM COMMAND
-    logic [7:0]                   cfg_m0_mode_reg  ;  // SPI MODE REG
 
-    logic [3:0]                   cfg_m1_cs_reg    ;  // Chip select
-    logic [1:0]                   cfg_m1_spi_imode ;  // Init SPI Mode 
-    logic [1:0]                   cfg_m1_spi_fmode ;  // Final SPI Mode 
-    logic [1:0]                   cfg_m1_spi_switch;  // SPI Mode Switching Place
+    logic [1:0]                   cfg_m0_g0_rd_spi_imode ;  // Init SPI Mode 
+    logic [1:0]                   cfg_m0_g0_rd_spi_fmode ;  // Final SPI Mode 
+    logic [1:0]                   cfg_m0_g0_rd_spi_switch;  // SPI Mode Switching Place
+    logic [3:0]                   cfg_m0_g0_rd_spi_seq   ;  // SPI SEQUENCE
+    logic [1:0]                   cfg_m0_g0_rd_addr_cnt  ;  // SPI Addr Count
+    logic [3:0]                   cfg_m0_g0_rd_dummy_cnt ;  // SPI Dummy Count
+    logic [7:0]                   cfg_m0_g0_rd_cmd_reg   ;  // SPI MEM COMMAND
+    logic [7:0]                   cfg_m0_g0_rd_mode_reg  ;  // SPI MODE REG
+
+    logic [1:0]                   cfg_m0_g0_wr_spi_imode ;  // Init SPI Mode 
+    logic [1:0]                   cfg_m0_g0_wr_spi_fmode ;  // Final SPI Mode 
+    logic [1:0]                   cfg_m0_g0_wr_spi_switch;  // SPI Mode Switching Place
+    logic [3:0]                   cfg_m0_g0_wr_spi_seq   ;  // SPI SEQUENCE
+    logic [1:0]                   cfg_m0_g0_wr_addr_cnt  ;  // SPI Addr Count
+    logic [3:0]                   cfg_m0_g0_wr_dummy_cnt ;  // SPI Dummy Count
+    logic [7:0]                   cfg_m0_g0_wr_cmd_reg   ;  // SPI MEM COMMAND
+    logic [7:0]                   cfg_m0_g0_wr_mode_reg  ;  // SPI MODE REG
+
+    logic [1:0]                   cfg_m0_g1_rd_spi_imode ;  // Init SPI Mode 
+    logic [1:0]                   cfg_m0_g1_rd_spi_fmode ;  // Final SPI Mode 
+    logic [1:0]                   cfg_m0_g1_rd_spi_switch;  // SPI Mode Switching Place
+    logic [3:0]                   cfg_m0_g1_rd_spi_seq   ;  // SPI SEQUENCE
+    logic [1:0]                   cfg_m0_g1_rd_addr_cnt  ;  // SPI Addr Count
+    logic [3:0]                   cfg_m0_g1_rd_dummy_cnt ;  // SPI Dummy Count
+    logic [7:0]                   cfg_m0_g1_rd_cmd_reg   ;  // SPI MEM COMMAND
+    logic [7:0]                   cfg_m0_g1_rd_mode_reg  ;  // SPI MODE REG
+
+    logic [1:0]                   cfg_m0_g1_wr_spi_imode ;  // Init SPI Mode 
+    logic [1:0]                   cfg_m0_g1_wr_spi_fmode ;  // Final SPI Mode 
+    logic [1:0]                   cfg_m0_g1_wr_spi_switch;  // SPI Mode Switching Place
+    logic [3:0]                   cfg_m0_g1_wr_spi_seq   ;  // SPI SEQUENCE
+    logic [1:0]                   cfg_m0_g1_wr_addr_cnt  ;  // SPI Addr Count
+    logic [3:0]                   cfg_m0_g1_wr_dummy_cnt ;  // SPI Dummy Count
+    logic [7:0]                   cfg_m0_g1_wr_cmd_reg   ;  // SPI MEM COMMAND
+    logic [7:0]                   cfg_m0_g1_wr_mode_reg  ;  // SPI MODE REG
 
     logic [1:0]                   cfg_cs_early     ;  // Amount of cycle early CS asserted
     logic [1:0]                   cfg_cs_late      ;  // Amount of cycle late CS de-asserted
@@ -196,6 +225,7 @@ module qspim_top
 
     // Towards m0 Command FIFO
     logic                         m0_cmd_fifo_full    ;   // Command FIFO full
+    logic                         m0_cmd_fifo_afull   ;   // Command FIFO full
     logic                         m0_cmd_fifo_empty   ;   // Command FIFO empty
     logic                         m0_cmd_fifo_wr      ;   // Command FIFO Write
     logic                         m0_cmd_fifo_rd      ;   // Command FIFO read
@@ -347,14 +377,42 @@ qspim_if #( .WB_WIDTH(WB_WIDTH),.CMD_FIFO_WD(CMD_FIFO_WD)) u_wb_if(
 	.cfg_m0_cs3_amask               (cfg_m0_cs3_amask             ),
         .cfg_dpft_dis                   (cfg_dpft_dis                 ),
         .cfg_fsm_reset                  (cfg_m0_fsm_reset             ),
-        .cfg_mem_seq                    (cfg_m0_spi_seq               ), // SPI MEM SEQUENCE
-        .cfg_addr_cnt                   (cfg_m0_addr_cnt              ), // SPI Addr Count
-        .cfg_dummy_cnt                  (cfg_m0_dummy_cnt             ), // SPI Dummy Count
-        .cfg_data_cnt                   (cfg_m0_data_cnt              ), // SPI Read Count
-        .cfg_cmd_reg                    (cfg_m0_cmd_reg               ), // SPI MEM COMMAND
-        .cfg_mode_reg                   (cfg_m0_mode_reg              ), // SPI MODE REG
 
-	.m0_cs_reg                      (m0_cs_reg                    ),
+        .cfg_m0_g0_rd_spi_imode        (cfg_m0_g0_rd_spi_imode      ), // Init SPI Mode 
+        .cfg_m0_g0_rd_spi_fmode        (cfg_m0_g0_rd_spi_fmode      ), // Final SPI Mode 
+        .cfg_m0_g0_rd_spi_switch       (cfg_m0_g0_rd_spi_switch     ), // SPI Mode Switching Place
+        .cfg_m0_g0_rd_spi_seq          (cfg_m0_g0_rd_spi_seq        ), // SPI SEQUENCE
+        .cfg_m0_g0_rd_addr_cnt         (cfg_m0_g0_rd_addr_cnt       ), // SPI Addr Count
+        .cfg_m0_g0_rd_dummy_cnt        (cfg_m0_g0_rd_dummy_cnt      ), // SPI Dummy Count
+        .cfg_m0_g0_rd_cmd_reg          (cfg_m0_g0_rd_cmd_reg        ), // SPI MEM COMMAND
+        .cfg_m0_g0_rd_mode_reg         (cfg_m0_g0_rd_mode_reg       ), // SPI MODE REG
+
+        .cfg_m0_g0_wr_spi_imode        (cfg_m0_g0_wr_spi_imode      ), // Init SPI Mode 
+        .cfg_m0_g0_wr_spi_fmode        (cfg_m0_g0_wr_spi_fmode      ), // Final SPI Mode 
+        .cfg_m0_g0_wr_spi_switch       (cfg_m0_g0_wr_spi_switch     ), // SPI Mode Switching Place
+        .cfg_m0_g0_wr_spi_seq          (cfg_m0_g0_wr_spi_seq        ), // SPI SEQUENCE
+        .cfg_m0_g0_wr_addr_cnt         (cfg_m0_g0_wr_addr_cnt       ), // SPI Addr Count
+        .cfg_m0_g0_wr_dummy_cnt        (cfg_m0_g0_wr_dummy_cnt      ), // SPI Dummy Count
+        .cfg_m0_g0_wr_cmd_reg          (cfg_m0_g0_wr_cmd_reg        ), // SPI MEM COMMAND
+        .cfg_m0_g0_wr_mode_reg         (cfg_m0_g0_wr_mode_reg       ), // SPI MODE REG
+
+        .cfg_m0_g1_rd_spi_imode        (cfg_m0_g1_rd_spi_imode      ), // Init SPI Mode 
+        .cfg_m0_g1_rd_spi_fmode        (cfg_m0_g1_rd_spi_fmode      ), // Final SPI Mode 
+        .cfg_m0_g1_rd_spi_switch       (cfg_m0_g1_rd_spi_switch     ), // SPI Mode Switching Place
+        .cfg_m0_g1_rd_spi_seq          (cfg_m0_g1_rd_spi_seq        ), // SPI SEQUENCE
+        .cfg_m0_g1_rd_addr_cnt         (cfg_m0_g1_rd_addr_cnt       ), // SPI Addr Count
+        .cfg_m0_g1_rd_dummy_cnt        (cfg_m0_g1_rd_dummy_cnt      ), // SPI Dummy Count
+        .cfg_m0_g1_rd_cmd_reg          (cfg_m0_g1_rd_cmd_reg        ), // SPI MEM COMMAND
+        .cfg_m0_g1_rd_mode_reg         (cfg_m0_g1_rd_mode_reg       ), // SPI MODE REG
+
+        .cfg_m0_g1_wr_spi_imode        (cfg_m0_g1_wr_spi_imode      ), // Init SPI Mode 
+        .cfg_m0_g1_wr_spi_fmode        (cfg_m0_g1_wr_spi_fmode      ), // Final SPI Mode 
+        .cfg_m0_g1_wr_spi_switch       (cfg_m0_g1_wr_spi_switch     ), // SPI Mode Switching Place
+        .cfg_m0_g1_wr_spi_seq          (cfg_m0_g1_wr_spi_seq        ), // SPI SEQUENCE
+        .cfg_m0_g1_wr_addr_cnt         (cfg_m0_g1_wr_addr_cnt       ), // SPI Addr Count
+        .cfg_m0_g1_wr_dummy_cnt        (cfg_m0_g1_wr_dummy_cnt      ), // SPI Dummy Count
+        .cfg_m0_g1_wr_cmd_reg          (cfg_m0_g1_wr_cmd_reg        ), // SPI MEM COMMAND
+        .cfg_m0_g1_wr_mode_reg         (cfg_m0_g1_wr_mode_reg       ), // SPI MODE REG
 
         .spi_init_done                  (spi_init_done                ), // SPI internal Init completed
 
@@ -369,6 +427,7 @@ qspim_if #( .WB_WIDTH(WB_WIDTH),.CMD_FIFO_WD(CMD_FIFO_WD)) u_wb_if(
 
     // Towards Command FIFO
         .cmd_fifo_full                  (m0_cmd_fifo_full             ), // Command FIFO full
+        .cmd_fifo_afull                 (m0_cmd_fifo_afull            ), // Command FIFO full
         .cmd_fifo_empty                 (m0_cmd_fifo_empty            ), // Command FIFO empty
         .cmd_fifo_wr                    (m0_cmd_fifo_wr               ), // Command FIFO Write
         .cmd_fifo_wdata                 (m0_cmd_fifo_wdata            ), // Command FIFO WData
@@ -409,20 +468,42 @@ qspim_regs
 
         .cfg_dpft_dis                   (cfg_dpft_dis                 ),
         .cfg_m0_fsm_reset               (cfg_m0_fsm_reset             ),
-        .cfg_m0_spi_imode               (cfg_m0_spi_imode             ), // Init SPI Mode 
-        .cfg_m0_spi_fmode               (cfg_m0_spi_fmode             ), // Final SPI Mode 
-        .cfg_m0_spi_switch              (cfg_m0_spi_switch            ), // SPI Mode Switching Place
-        .cfg_m0_spi_seq                 (cfg_m0_spi_seq               ), // SPI SEQUENCE
-        .cfg_m0_addr_cnt                (cfg_m0_addr_cnt              ), // SPI Addr Count
-        .cfg_m0_dummy_cnt               (cfg_m0_dummy_cnt             ), // SPI Dummy Count
-        .cfg_m0_data_cnt                (cfg_m0_data_cnt              ), // SPI Read Count
-        .cfg_m0_cmd_reg                 (cfg_m0_cmd_reg               ), // SPI MEM COMMAND
-        .cfg_m0_mode_reg                (cfg_m0_mode_reg              ), // SPI MODE REG
 
-        .cfg_m1_cs_reg                  (cfg_m1_cs_reg                ), // Chip select
-        .cfg_m1_spi_imode               (cfg_m1_spi_imode             ), // Final SPI Mode 
-        .cfg_m1_spi_fmode               (cfg_m1_spi_fmode             ), // Final SPI Mode 
-        .cfg_m1_spi_switch              (cfg_m1_spi_switch            ), // SPI Mode Switching Place
+        .cfg_m0_g0_rd_spi_imode        (cfg_m0_g0_rd_spi_imode      ), // Init SPI Mode 
+        .cfg_m0_g0_rd_spi_fmode        (cfg_m0_g0_rd_spi_fmode      ), // Final SPI Mode 
+        .cfg_m0_g0_rd_spi_switch       (cfg_m0_g0_rd_spi_switch     ), // SPI Mode Switching Place
+        .cfg_m0_g0_rd_spi_seq          (cfg_m0_g0_rd_spi_seq        ), // SPI SEQUENCE
+        .cfg_m0_g0_rd_addr_cnt         (cfg_m0_g0_rd_addr_cnt       ), // SPI Addr Count
+        .cfg_m0_g0_rd_dummy_cnt        (cfg_m0_g0_rd_dummy_cnt      ), // SPI Dummy Count
+        .cfg_m0_g0_rd_cmd_reg          (cfg_m0_g0_rd_cmd_reg        ), // SPI MEM COMMAND
+        .cfg_m0_g0_rd_mode_reg         (cfg_m0_g0_rd_mode_reg       ), // SPI MODE REG
+
+        .cfg_m0_g0_wr_spi_imode        (cfg_m0_g0_wr_spi_imode      ), // Init SPI Mode 
+        .cfg_m0_g0_wr_spi_fmode        (cfg_m0_g0_wr_spi_fmode      ), // Final SPI Mode 
+        .cfg_m0_g0_wr_spi_switch       (cfg_m0_g0_wr_spi_switch     ), // SPI Mode Switching Place
+        .cfg_m0_g0_wr_spi_seq          (cfg_m0_g0_wr_spi_seq        ), // SPI SEQUENCE
+        .cfg_m0_g0_wr_addr_cnt         (cfg_m0_g0_wr_addr_cnt       ), // SPI Addr Count
+        .cfg_m0_g0_wr_dummy_cnt        (cfg_m0_g0_wr_dummy_cnt      ), // SPI Dummy Count
+        .cfg_m0_g0_wr_cmd_reg          (cfg_m0_g0_wr_cmd_reg        ), // SPI MEM COMMAND
+        .cfg_m0_g0_wr_mode_reg         (cfg_m0_g0_wr_mode_reg       ), // SPI MODE REG
+
+        .cfg_m0_g1_rd_spi_imode        (cfg_m0_g1_rd_spi_imode      ), // Init SPI Mode 
+        .cfg_m0_g1_rd_spi_fmode        (cfg_m0_g1_rd_spi_fmode      ), // Final SPI Mode 
+        .cfg_m0_g1_rd_spi_switch       (cfg_m0_g1_rd_spi_switch     ), // SPI Mode Switching Place
+        .cfg_m0_g1_rd_spi_seq          (cfg_m0_g1_rd_spi_seq        ), // SPI SEQUENCE
+        .cfg_m0_g1_rd_addr_cnt         (cfg_m0_g1_rd_addr_cnt       ), // SPI Addr Count
+        .cfg_m0_g1_rd_dummy_cnt        (cfg_m0_g1_rd_dummy_cnt      ), // SPI Dummy Count
+        .cfg_m0_g1_rd_cmd_reg          (cfg_m0_g1_rd_cmd_reg        ), // SPI MEM COMMAND
+        .cfg_m0_g1_rd_mode_reg         (cfg_m0_g1_rd_mode_reg       ), // SPI MODE REG
+
+        .cfg_m0_g1_wr_spi_imode        (cfg_m0_g1_wr_spi_imode      ), // Init SPI Mode 
+        .cfg_m0_g1_wr_spi_fmode        (cfg_m0_g1_wr_spi_fmode      ), // Final SPI Mode 
+        .cfg_m0_g1_wr_spi_switch       (cfg_m0_g1_wr_spi_switch     ), // SPI Mode Switching Place
+        .cfg_m0_g1_wr_spi_seq          (cfg_m0_g1_wr_spi_seq        ), // SPI SEQUENCE
+        .cfg_m0_g1_wr_addr_cnt         (cfg_m0_g1_wr_addr_cnt       ), // SPI Addr Count
+        .cfg_m0_g1_wr_dummy_cnt        (cfg_m0_g1_wr_dummy_cnt      ), // SPI Dummy Count
+        .cfg_m0_g1_wr_cmd_reg          (cfg_m0_g1_wr_cmd_reg        ), // SPI MEM COMMAND
+        .cfg_m0_g1_wr_mode_reg         (cfg_m0_g1_wr_mode_reg       ), // SPI MODE REG
 
 	.cfg_cs_early                   (cfg_cs_early                 ),
 	.cfg_cs_late                    (cfg_cs_late                  ),
@@ -460,7 +541,7 @@ qspim_fifo #(.W(CMD_FIFO_WD), .DP(4)) u_m0_cmd_fifo (
          .wr_en                         (m0_cmd_fifo_wr              ),
          .wr_data                       (m0_cmd_fifo_wdata           ),
          .full                          (m0_cmd_fifo_full            ),                 
-         .afull                         (                            ),                 
+         .afull                         (m0_cmd_fifo_afull           ),                 
          .rd_en                         (m0_cmd_fifo_rd              ),
          .empty                         (m0_cmd_fifo_empty           ),                
          .aempty                        (                            ),                
@@ -520,15 +601,6 @@ qspim_ctrl #(.CMD_FIFO_WD(CMD_FIFO_WD)) u_spictrl
         .spi_clk_div                    (spi_clk_div                  ),
         .spi_status                     (spi_ctrl_status              ),
 
-        .cfg_m0_cs_reg                  (m0_cs_reg                    ), // Chip select
-        .cfg_m0_spi_imode               (cfg_m0_spi_imode             ), // Init SPI Mode 
-        .cfg_m0_spi_fmode               (cfg_m0_spi_fmode             ), // Final SPI Mode 
-        .cfg_m0_spi_switch              (cfg_m0_spi_switch            ), // SPI Mode Switching Place
-
-        .cfg_m1_cs_reg                  (cfg_m1_cs_reg                ), // Chip select
-        .cfg_m1_spi_imode               (cfg_m1_spi_imode             ), // Init SPI Mode 
-        .cfg_m1_spi_fmode               (cfg_m1_spi_fmode             ), // Final SPI Mode 
-        .cfg_m1_spi_switch              (cfg_m1_spi_switch            ), // SPI Mode Switching Place
 
 	.cfg_cs_early                   (cfg_cs_early                 ),
 	.cfg_cs_late                    (cfg_cs_late                  ),

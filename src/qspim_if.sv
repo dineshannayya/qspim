@@ -69,7 +69,7 @@
 //////////////////////////////////////////////////////////////////////
 
 
-module qspim_if #( parameter WB_WIDTH = 32,parameter CMD_FIFO_WD=40) (
+module qspim_if #( parameter WB_WIDTH = 32,parameter CMD_FIFO_WD=50) (
     input  logic                         mclk,
     input  logic                         rst_n,
 
@@ -99,15 +99,46 @@ module qspim_if #( parameter WB_WIDTH = 32,parameter CMD_FIFO_WD=40) (
 
     input logic                          cfg_dpft_dis,   // Direct Mem Prefetch enable/disable
     input logic                          cfg_fsm_reset,
-    input logic [3:0]                    cfg_mem_seq,    // SPI MEM SEQUENCE
-    input logic [1:0]                    cfg_addr_cnt,   // SPI Addr Count
-    input logic [3:0]                    cfg_dummy_cnt,  // SPI Dummy Count
-    input logic [7:0]                    cfg_data_cnt,   // SPI Read Count
-    input logic [7:0]                    cfg_cmd_reg,    // SPI MEM COMMAND
-    input logic [7:0]                    cfg_mode_reg,   // SPI MODE REG
+
+    input logic [1:0]                    cfg_m0_g0_rd_spi_imode ,  // Init SPI Mode 
+    input logic [1:0]                    cfg_m0_g0_rd_spi_fmode ,  // Final SPI Mode 
+    input logic [1:0]                    cfg_m0_g0_rd_spi_switch,  // SPI Mode Switching Place
+    input logic [3:0]                    cfg_m0_g0_rd_spi_seq   ,  // SPI SEQUENCE
+    input logic [1:0]                    cfg_m0_g0_rd_addr_cnt  ,  // SPI Addr Count
+    input logic [3:0]                    cfg_m0_g0_rd_dummy_cnt ,  // SPI Dummy Count
+    input logic [7:0]                    cfg_m0_g0_rd_cmd_reg   ,  // SPI MEM COMMAND
+    input logic [7:0]                    cfg_m0_g0_rd_mode_reg  ,  // SPI MODE REG
+
+    input logic [1:0]                    cfg_m0_g0_wr_spi_imode ,  // Init SPI Mode 
+    input logic [1:0]                    cfg_m0_g0_wr_spi_fmode ,  // Final SPI Mode 
+    input logic [1:0]                    cfg_m0_g0_wr_spi_switch,  // SPI Mode Switching Place
+    input logic [3:0]                    cfg_m0_g0_wr_spi_seq   ,  // SPI SEQUENCE
+    input logic [1:0]                    cfg_m0_g0_wr_addr_cnt  ,  // SPI Addr Count
+    input logic [3:0]                    cfg_m0_g0_wr_dummy_cnt ,  // SPI Dummy Count
+    input logic [7:0]                    cfg_m0_g0_wr_cmd_reg   ,  // SPI MEM COMMAND
+    input logic [7:0]                    cfg_m0_g0_wr_mode_reg  ,  // SPI MODE REG
+
+    input logic [1:0]                    cfg_m0_g1_rd_spi_imode ,  // Init SPI Mode 
+    input logic [1:0]                    cfg_m0_g1_rd_spi_fmode ,  // Final SPI Mode 
+    input logic [1:0]                    cfg_m0_g1_rd_spi_switch,  // SPI Mode Switching Place
+    input logic [3:0]                    cfg_m0_g1_rd_spi_seq   ,  // SPI SEQUENCE
+    input logic [1:0]                    cfg_m0_g1_rd_addr_cnt  ,  // SPI Addr Count
+    input logic [3:0]                    cfg_m0_g1_rd_dummy_cnt ,  // SPI Dummy Count
+    input logic [7:0]                    cfg_m0_g1_rd_cmd_reg   ,  // SPI MEM COMMAND
+    input logic [7:0]                    cfg_m0_g1_rd_mode_reg  ,  // SPI MODE REG
+
+    input logic [1:0]                    cfg_m0_g1_wr_spi_imode ,  // Init SPI Mode 
+    input logic [1:0]                    cfg_m0_g1_wr_spi_fmode ,  // Final SPI Mode 
+    input logic [1:0]                    cfg_m0_g1_wr_spi_switch,  // SPI Mode Switching Place
+    input logic [3:0]                    cfg_m0_g1_wr_spi_seq   ,  // SPI SEQUENCE
+    input logic [1:0]                    cfg_m0_g1_wr_addr_cnt  ,  // SPI Addr Count
+    input logic [3:0]                    cfg_m0_g1_wr_dummy_cnt ,  // SPI Dummy Count
+    input logic [7:0]                    cfg_m0_g1_wr_cmd_reg   ,  // SPI MEM COMMAND
+    input logic [7:0]                    cfg_m0_g1_wr_mode_reg  ,  // SPI MODE REG
+
+
     input logic                          spi_init_done,  // SPI internal Init completed
 
-    output logic [3:0]                   m0_cs_reg,
 
     // Towards Reg I/F
     output logic                         spim_reg_req,     // Reg Request
@@ -120,9 +151,10 @@ module qspim_if #( parameter WB_WIDTH = 32,parameter CMD_FIFO_WD=40) (
 
     // Towards Command FIFO
     input  logic                         cmd_fifo_full,   // Command FIFO full
-    input  logic                         cmd_fifo_empty,   // Command FIFO empty
-    output logic                         cmd_fifo_wr,      // Command FIFO Write
-    output logic [CMD_FIFO_WD-1:0]       cmd_fifo_wdata,   // Command FIFO WData
+    input  logic                         cmd_fifo_afull,  // Command FIFO full
+    input  logic                         cmd_fifo_empty,  // Command FIFO empty
+    output logic                         cmd_fifo_wr,     // Command FIFO Write
+    output logic [CMD_FIFO_WD-1:0]       cmd_fifo_wdata,  // Command FIFO WData
     
     // Towards Response FIFO
     input  logic                         res_fifo_empty,   // Response FIFO Empty
@@ -166,10 +198,16 @@ logic [9:0]           next_wbd_bl_cnt;
 logic                 spim_mem_ack   ;
 logic [3:0]           next_state     ;
 
-logic 	              NextPreDVal    ;
-logic [9:0]	      NextPreDCnt    ;
-logic [31:0]	      NextPreAddr    ;
 
+logic [3:0]           cfg_m0_cs_reg           ;
+logic [1:0]           cfg_m0_spi_imode ;  // Init SPI Mode 
+logic [1:0]           cfg_m0_spi_fmode ;  // Final SPI Mode 
+logic [1:0]           cfg_m0_spi_switch;  // SPI Mode Switching Place
+logic [3:0]           cfg_m0_spi_seq   ;  // SPI SEQUENCE
+logic [1:0]           cfg_m0_addr_cnt  ;  // SPI Addr Count
+logic [3:0]           cfg_m0_dummy_cnt ;  // SPI Dummy Count
+logic [7:0]           cfg_m0_cmd_reg   ;  // SPI MEM COMMAND
+logic [7:0]           cfg_m0_mode_reg  ;  // SPI MODE REG
 
   //---------------------------------------------------------------
   // Address Decoding
@@ -237,8 +275,6 @@ always_ff @(negedge rst_n or posedge mclk) begin
                spim_wb_addr <= spim_wb_addr+4;
 	    end
 
-            spim_wb_wdata <= wbd_dat_i;
-            spim_wb_be    <= wbd_sel_i;
             spim_wb_we    <= wbd_we_i;
     
     
@@ -254,18 +290,75 @@ end
 
 // Generate CS# based on the Direct Address Map [27:20]
 //
-always_ff @(negedge rst_n or posedge mclk) begin
-    if ( rst_n == 1'b0 ) begin
-	m0_cs_reg <= 4'b0;
-    end else begin
-	if(state == ADR_PHASE) begin
-           m0_cs_reg[0] <=  ((spim_wb_addr[27:20] & cfg_m0_cs0_amask) == cfg_m0_cs0_addr) ;
-           m0_cs_reg[1] <=  ((spim_wb_addr[27:20] & cfg_m0_cs1_amask) == cfg_m0_cs1_addr) ;
-           m0_cs_reg[2] <=  ((spim_wb_addr[27:20] & cfg_m0_cs2_amask) == cfg_m0_cs2_addr) ;
-           m0_cs_reg[3] <=  ((spim_wb_addr[27:20] & cfg_m0_cs3_amask) == cfg_m0_cs3_addr) ;
-	end
-    end
+assign  cfg_m0_cs_reg[0] =  ((wbd_adr_i[27:20] & cfg_m0_cs0_amask) == cfg_m0_cs0_addr) ;
+assign  cfg_m0_cs_reg[1] =  ((wbd_adr_i[27:20] & cfg_m0_cs1_amask) == cfg_m0_cs1_addr) ;
+assign  cfg_m0_cs_reg[2] =  ((wbd_adr_i[27:20] & cfg_m0_cs2_amask) == cfg_m0_cs2_addr) ;
+assign  cfg_m0_cs_reg[3] =  ((wbd_adr_i[27:20] & cfg_m0_cs3_amask) == cfg_m0_cs3_addr) ;
+
+
+
+// Select the configuration based on the chip select
+// Note: CS0/CS1 share same config of g0
+//       CS2/CS3 Share same config of g1
+always_comb begin
+         cfg_m0_spi_imode     = cfg_m0_g0_rd_spi_imode;
+         cfg_m0_spi_fmode     = cfg_m0_g0_rd_spi_fmode;
+         cfg_m0_spi_switch    = cfg_m0_g0_rd_spi_switch;
+         cfg_m0_spi_seq       = cfg_m0_g0_rd_spi_seq;
+         cfg_m0_addr_cnt      = cfg_m0_g0_rd_addr_cnt;
+         cfg_m0_dummy_cnt     = cfg_m0_g0_rd_dummy_cnt;
+         cfg_m0_cmd_reg       = cfg_m0_g0_rd_cmd_reg;
+         cfg_m0_mode_reg      = cfg_m0_g0_rd_mode_reg;
+
+	case({cfg_m0_cs_reg[3:0],wbd_we_i})
+		5'b00010,5'b00100: begin // CS0/CS1 Read Phase
+			cfg_m0_spi_imode     = cfg_m0_g0_rd_spi_imode;
+                        cfg_m0_spi_fmode     = cfg_m0_g0_rd_spi_fmode;
+                        cfg_m0_spi_switch    = cfg_m0_g0_rd_spi_switch;
+                        cfg_m0_spi_seq       = cfg_m0_g0_rd_spi_seq;
+                        cfg_m0_addr_cnt      = cfg_m0_g0_rd_addr_cnt;
+                        cfg_m0_dummy_cnt     = cfg_m0_g0_rd_dummy_cnt;
+                        cfg_m0_cmd_reg       = cfg_m0_g0_rd_cmd_reg;
+                        cfg_m0_mode_reg      = cfg_m0_g0_rd_mode_reg;
+		end
+		5'b00011,5'b00101: begin // CS0/CS1 Write Phase
+			cfg_m0_spi_imode     = cfg_m0_g0_wr_spi_imode;
+                        cfg_m0_spi_fmode     = cfg_m0_g0_wr_spi_fmode;
+                        cfg_m0_spi_switch    = cfg_m0_g0_wr_spi_switch;
+                        cfg_m0_spi_seq       = cfg_m0_g0_wr_spi_seq;
+                        cfg_m0_addr_cnt      = cfg_m0_g0_wr_addr_cnt;
+                        cfg_m0_dummy_cnt     = cfg_m0_g0_wr_dummy_cnt;
+                        cfg_m0_cmd_reg       = cfg_m0_g0_wr_cmd_reg;
+                        cfg_m0_mode_reg      = cfg_m0_g0_wr_mode_reg;
+		end
+		5'b01000,5'b10000: begin // CS2/CS3 Read Phase
+			cfg_m0_spi_imode     = cfg_m0_g1_rd_spi_imode;
+                        cfg_m0_spi_fmode     = cfg_m0_g1_rd_spi_fmode;
+                        cfg_m0_spi_switch    = cfg_m0_g1_rd_spi_switch;
+                        cfg_m0_spi_seq       = cfg_m0_g1_rd_spi_seq;
+                        cfg_m0_addr_cnt      = cfg_m0_g1_rd_addr_cnt;
+                        cfg_m0_dummy_cnt     = cfg_m0_g1_rd_dummy_cnt;
+                        cfg_m0_cmd_reg       = cfg_m0_g1_rd_cmd_reg;
+                        cfg_m0_mode_reg      = cfg_m0_g1_rd_mode_reg;
+		end
+		5'b01001,5'b10001: begin // CS2/CS3 Write Phase
+			cfg_m0_spi_imode     = cfg_m0_g1_wr_spi_imode;
+                        cfg_m0_spi_fmode     = cfg_m0_g1_wr_spi_fmode;
+                        cfg_m0_spi_switch    = cfg_m0_g1_wr_spi_switch;
+                        cfg_m0_spi_seq       = cfg_m0_g1_wr_spi_seq;
+                        cfg_m0_addr_cnt      = cfg_m0_g1_wr_addr_cnt;
+                        cfg_m0_dummy_cnt     = cfg_m0_g1_wr_dummy_cnt;
+                        cfg_m0_cmd_reg       = cfg_m0_g1_wr_cmd_reg;
+                        cfg_m0_mode_reg      = cfg_m0_g1_wr_mode_reg;
+		end
+
+
+	endcase
+
+
 end
+
+
 
 always_ff @(negedge rst_n or posedge mclk) begin
     if ( rst_n == 1'b0 ) begin
@@ -292,14 +385,13 @@ begin
    next_state     = state;
    case(state)
    IDLE:  begin
-	// Check If any prefetch data available and if see it matched with WB
-	// address, If yes, the move to data reading from response fifo, else 
-	// generate command request
-	if(spim_mem_req && !wbd_we_i && NextPreDVal && (wbd_adr_i == NextPreAddr) && !cfg_dpft_dis) begin
-	  next_wbd_bl_cnt = wbd_bl_i;
-          next_state = READ_DATA;
-	end else if(spim_mem_req && cmd_fifo_empty) begin
-	   cmd_fifo_wdata = {SOC,NOC,{wbd_bl_i[9:0],2'b0},cfg_dummy_cnt[3:0],cfg_addr_cnt[1:0],cfg_mem_seq[3:0],cfg_mode_reg[7:0],cfg_cmd_reg[7:0]};
+	if(spim_mem_req && cmd_fifo_empty) begin
+	   cmd_fifo_wdata = {SOC,NOC,{wbd_bl_i[9:0],2'b0},
+		                  cfg_m0_dummy_cnt[3:0],cfg_m0_addr_cnt[1:0],
+		                  cfg_m0_spi_switch[1:0],cfg_m0_spi_fmode[1:0],
+		                  cfg_m0_spi_imode[1:0],
+				  cfg_m0_spi_seq[3:0],cfg_m0_cs_reg[3:0],
+		                  cfg_m0_mode_reg[7:0],cfg_m0_cmd_reg[7:0]};
 	   next_wbd_bl_cnt = wbd_bl_i;
 	   cmd_fifo_wr    = 1;
 	   next_state = ADR_PHASE;
@@ -307,10 +399,10 @@ begin
    end
    ADR_PHASE: begin
 	  if(spim_wb_we) begin
-              cmd_fifo_wdata = {NOC,NOC,6'b0,spim_wb_addr[31:0]};
+              cmd_fifo_wdata = {NOC,NOC,16'h0,spim_wb_addr[31:0]};
              next_state = WRITE_DATA;
           end else begin
-              cmd_fifo_wdata = {NOC,EOC,6'b0,spim_wb_addr[31:0]};
+              cmd_fifo_wdata = {NOC,EOC,16'h0,spim_wb_addr[31:0]};
              next_state = CMD_WAIT;
           end
           cmd_fifo_wr      = 1;
@@ -333,44 +425,23 @@ begin
 	end
    end
    WRITE_DATA: begin
-	if(cmd_fifo_full != 1 && wbd_bry_i) begin
-           cmd_fifo_wdata = {NOC,EOC,6'b0,spim_wb_wdata[31:0]};
-	   next_wbd_bl_cnt = wbd_bl_cnt-1;
+       if(wbd_ack_o)begin 
+           cmd_fifo_wdata = {NOC,EOC,16'b0,wbd_dat_i[31:0]};
            cmd_fifo_wr    = 1;
-           spim_mem_ack  = 1;
-	   if(next_wbd_bl_cnt == 0) 
-               next_state    = IDLE;
+	end
+	if(cmd_fifo_full != 1 && !(cmd_fifo_afull && wbd_ack_o) &&  wbd_bry_i) begin
+	   if(next_wbd_bl_cnt == 0)  begin
+              next_state   = IDLE;
+           end else begin
+	      next_wbd_bl_cnt = wbd_bl_cnt-1;
+              spim_mem_ack = 1;
+           end
 	end
    end
    endcase
 end
 
-/*****************************************************************
-* This logic help to find any pre-fetch data available inside the response
-* FIFO and if the next data read request address matches with NextPreAddr, The read
-* the data from Response FIFO, else generate new request
-* Note: Basic Assumption is cmd_fifo_wr & res_fifo_rd does not occur in same
-* time as it's generation control through FSM
-* **********************************************************/
     
-always_ff @(negedge rst_n or posedge mclk) begin
-    if ( rst_n == 1'b0 ) begin
-	NextPreDVal       <= 1'b0;
-	NextPreDCnt       <= 'h0;
-	NextPreAddr       <= 'h0;
-    end else if(cmd_fifo_wr) begin
-       NextPreDVal    <= 1'b1;
-       NextPreDCnt    <= wbd_bl_i; // Word Count
-       NextPreAddr    <= wbd_adr_i;
-    end else if (res_fifo_rd) begin
-	if(NextPreDCnt == 1) begin
-            NextPreDVal <= 1'b0;
-        end else begin
-           NextPreDCnt <= NextPreDCnt-1;
-           NextPreAddr <= NextPreAddr+1;
-        end
-    end
-end
 
 
 endmodule

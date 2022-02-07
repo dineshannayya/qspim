@@ -61,7 +61,7 @@
 ////                                                              ////
 //////////////////////////////////////////////////////////////////////
 module qspim_ctrl  #(
-     parameter CMD_FIFO_WD=40,
+     parameter CMD_FIFO_WD=50,
      parameter ENDIEAN = 0  // 0 - Little, 1 - Big endian, since RISV is Little indian default set 0
      )
 
@@ -73,15 +73,6 @@ module qspim_ctrl  #(
     output logic                    [8:0] spi_status,
 
     // Master 0 Configuration
-    input  logic [3:0]                   cfg_m0_cs_reg    ,  // Chip select
-    input  logic [1:0]                   cfg_m0_spi_imode  ,  // Init SPI Mode 
-    input  logic [1:0]                   cfg_m0_spi_fmode  ,  // Final SPI Mode 
-    input  logic [1:0]                   cfg_m0_spi_switch,  // SPI Mode Switching Place
-
-    input  logic [3:0]                   cfg_m1_cs_reg    ,  // Chip select
-    input  logic [1:0]                   cfg_m1_spi_imode  ,  // Init SPI Mode 
-    input  logic [1:0]                   cfg_m1_spi_fmode  ,  // Final SPI Mode 
-    input  logic [1:0]                   cfg_m1_spi_switch,  // SPI Mode Switching Place
 
     input  logic [1:0]                   cfg_cs_early     ,  // Amount of cycle early CS asserted
     input  logic [1:0]                   cfg_cs_late      ,  // Amount of cycle late CS de-asserted
@@ -245,8 +236,19 @@ parameter P_FSM_CR     = 4'b1100;  // COMMAND -> READ
 
   enum logic [2:0] {DATA_NULL,DATA_EMPTY,DATA_CMD,DATA_ADDR,DATA_MODE,DATA_FIFO} ctrl_data_mux;
 
-  enum logic [4:0] {FSM_IDLE,FSM_CS_ASSERT,FSM_CMD_PHASE,FSM_ADR_PHASE,FSM_DUMMY_PHASE,FSM_MODE_PHASE,FSM_WRITE_CMD,FSM_WRITE_PHASE,
-	            FSM_READ_WAIT,FSM_READ_PHASE,FSM_TX_DONE,FSM_FLUSH,FSM_CS_DEASEERT} state,next_state;
+  enum logic [4:0] {FSM_IDLE        = 5'h0,
+	            FSM_CS_ASSERT   = 5'h1,
+		    FSM_CMD_PHASE   = 5'h2,
+		    FSM_ADR_PHASE   = 5'h3,
+		    FSM_DUMMY_PHASE = 5'h4,
+		    FSM_MODE_PHASE  = 5'h5,
+		    FSM_WRITE_CMD   = 5'h6,
+		    FSM_WRITE_PHASE = 5'h7,
+	            FSM_READ_WAIT   = 5'h8,
+		    FSM_READ_PHASE  = 5'h9,
+		    FSM_TX_DONE     = 5'hA,
+		    FSM_FLUSH       = 5'hB,
+		    FSM_CS_DEASEERT = 5'hC} state,next_state;
 
  
   assign ctrl_state =  state[3:0];
@@ -262,10 +264,6 @@ parameter P_FSM_CR     = 4'b1100;  // COMMAND -> READ
   logic [1:0]  cfg_spi_switch;  // SPI Mode Switching Place
 
   
-  assign cfg_cs_reg     = (gnt == 2'b01) ? cfg_m0_cs_reg    : cfg_m1_cs_reg;
-  assign cfg_spi_imode  = (gnt == 2'b01) ? cfg_m0_spi_imode  : cfg_m1_spi_imode;  // Final SPI Mode 
-  assign cfg_spi_fmode  = (gnt == 2'b01) ? cfg_m0_spi_fmode  : cfg_m1_spi_fmode;  // Final SPI Mode 
-  assign cfg_spi_switch = (gnt == 2'b01) ? cfg_m0_spi_switch: cfg_m1_spi_switch;  // SPI Mode Switching Place
 
   //----------------------------
   // Command FIFO
@@ -649,21 +647,33 @@ end
       cfg_addr_cnt    <= 'h0;
       cfg_dummy_cnt   <= 'h0;
       cfg_data_cnt    <= 'h0;
+      cfg_cs_reg      <= 'h0;
+      cfg_spi_imode   <= 'h0;
+      cfg_spi_fmode   <= 'h0;
+      cfg_spi_switch  <= 'h0;
     end else begin
        if(state == FSM_IDLE) begin
            if(!m0_cmd_fifo_empty) begin
-              cfg_data_cnt    <= m0_cmd_fifo_rdata[37:26];
-              cfg_dummy_cnt   <= m0_cmd_fifo_rdata[25:22];
-              cfg_addr_cnt    <= m0_cmd_fifo_rdata[21:20];
-              cfg_spi_seq     <= m0_cmd_fifo_rdata[19:16];
+              cfg_data_cnt    <= m0_cmd_fifo_rdata[47:36];
+              cfg_dummy_cnt   <= m0_cmd_fifo_rdata[35:32];
+              cfg_addr_cnt    <= m0_cmd_fifo_rdata[31:30];
+	      cfg_spi_switch  <= m0_cmd_fifo_rdata[29:28];
+              cfg_spi_fmode   <= m0_cmd_fifo_rdata[27:26];
+              cfg_spi_imode   <= m0_cmd_fifo_rdata[25:24];
+              cfg_spi_seq     <= m0_cmd_fifo_rdata[23:20];
+	      cfg_cs_reg      <= m0_cmd_fifo_rdata[19:16];
               spi_mode_cmd    <= m0_cmd_fifo_rdata[15:8];
               gnt             <= 2'b01;
            end
            else if(!m1_cmd_fifo_empty ) begin
-              cfg_data_cnt    <= m1_cmd_fifo_rdata[37:26];
-              cfg_dummy_cnt   <= m1_cmd_fifo_rdata[25:22];
-              cfg_addr_cnt    <= m1_cmd_fifo_rdata[21:20];
-              cfg_spi_seq     <= m1_cmd_fifo_rdata[19:16];
+              cfg_data_cnt    <= m1_cmd_fifo_rdata[47:36];
+              cfg_dummy_cnt   <= m1_cmd_fifo_rdata[35:32];
+              cfg_addr_cnt    <= m1_cmd_fifo_rdata[31:30];
+	      cfg_spi_switch  <= m1_cmd_fifo_rdata[29:28];
+              cfg_spi_fmode   <= m1_cmd_fifo_rdata[27:26];
+              cfg_spi_imode   <= m1_cmd_fifo_rdata[25:24];
+              cfg_spi_seq     <= m1_cmd_fifo_rdata[23:20];
+	      cfg_cs_reg      <= m1_cmd_fifo_rdata[19:16];
               spi_mode_cmd    <= m1_cmd_fifo_rdata[15:8];
               gnt             <= 2'b10;
            end
