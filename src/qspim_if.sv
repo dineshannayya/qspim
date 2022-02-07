@@ -219,10 +219,10 @@ logic [7:0]           cfg_m0_mode_reg  ;  // SPI MODE REG
   // will be done inside the wishbone inter-connect 
   // --------------------------------------------------------------
 
-  assign spim_mem_req = (wbd_stb_i && !wbd_lack_o && (wbd_adr_i[28] == 1'b0));
+  assign spim_mem_req = (spi_init_done && wbd_stb_i && !wbd_lack_o && (wbd_adr_i[28] == 1'b0));
 
   // Generate Once cycle delayed wbd_stb_l
-  assign spim_reg_req = (wbd_stb_i && !wbd_lack_o && (wbd_adr_i[28] == 1'b1)) ;
+  assign spim_reg_req = (spi_init_done && wbd_stb_i && !wbd_lack_o && (wbd_adr_i[28] == 1'b1)) ;
 
   assign spim_reg_addr  = wbd_adr_i[5:2];
   assign spim_reg_wdata = wbd_dat_i;
