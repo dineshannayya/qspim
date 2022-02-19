@@ -156,7 +156,7 @@ module cy15b104qs
 
     parameter UserPreload       = 1;
     parameter mem_file_name     = "none";//"cy15b104qs.mem";
-    parameter otp_file_name     = "cy15b104qsOTP.mem";//"none";
+    parameter otp_file_name     = "none";//"none";
 
     parameter TimingModel       = "CY15B104QSN-108SXI";
 

@@ -219,6 +219,8 @@ parameter P_QDDR   = 2'b11;
         tri  flash_io3;
         wire [3:0] spi_sdi ;
 
+	reg [7:0] cnt;
+
 	// External clock is used by default.  Make this artificially fast for the
 	// simulation.  Normally this would be a slow clock and the digital PLL
 	// would be the fast clock.
@@ -253,6 +255,7 @@ parameter P_QDDR   = 2'b11;
 		#100;
 		wb_rst_i = 1'b0;	    	// Release reset
 
+		$dumpoff;
 	        repeat (200) @(posedge clock);
 		// CS#2 SSPI Indirect RAM READ ACCESS-
 		wb_user_core_write(`QSPIM_IMEM_CTRL1,{16'h0,1'b0,1'b0,4'b0000,P_MODE_SWITCH_IDLE,P_SINGLE,P_SINGLE,4'b0100});
@@ -1339,6 +1342,28 @@ parameter P_QDDR   = 2'b11;
 		data_array[10'h1B]   = 32'h00020059;
 		wb_user_core_bread_check(32'h00000280,10'h1C);
 
+		$dumpon;
+		$display("#############################################");
+		$display("  clock config validation in SSPI Mode       ");
+		$display("#############################################");
+		for(cnt = 4; cnt < 16; cnt = cnt+2) begin
+		    $display("SPI Testing with Clock Div value: %x ",cnt);
+		    wb_user_core_write(`QSPIM_GLBL_CTRL,{16'h0, cnt[7:0],4'b0,2'b01,2'b01});
+
+		    wb_user_core_write(`QSPIM_DMEM_G1_WR_CTRL,{P_FSM_CAW, 4'b0000,2'b10,P_MODE_SWITCH_IDLE,P_SINGLE,P_SINGLE,8'h00,8'h02});
+		    wb_user_core_write(`QSPIM_DMEM_G1_RD_CTRL,{P_FSM_CADR,4'b0000,2'b10,P_MODE_SWITCH_IDLE,P_SINGLE,P_SINGLE,8'h00,8'h03});
+
+		    data_array[10'h0]    = 32'h00112233;
+		    data_array[10'h1]    = 32'h44556677;
+		    data_array[10'h2]    = 32'h8899AABB;
+		    data_array[10'h3]    = 32'hCCDDEEFF;
+		    data_array[10'h4]    = 32'h00001111;
+		    data_array[10'h5]    = 32'h22223333;
+		    data_array[10'h6]    = 32'h44445555;
+		    data_array[10'h7]    = 32'h66667777;
+		    wb_user_core_bwrite(32'h08000000,10'h8);
+		    wb_user_core_bread_check(32'h08000000,10'h8);
+		 end
 
 	        /**
 		//-----------------------------------------------------------------

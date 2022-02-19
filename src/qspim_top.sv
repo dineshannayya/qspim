@@ -91,9 +91,11 @@
 ////             CS0/CS1 will have Config support for FLASH SPI   ////
 ////             CS2/CS3 will have config support SRAM SPI        ////
 ////     1.2  - Feb 19, 2022, Dinesh A                            ////
-////            Bug fix in spi rise and fall pulse relation w.r.t ////
-////            spi_clk. Note: Previous version work only with    ////
-////            spi clock config = 0x2                            ////
+////        A. Bug fix in spi rise and fall pulse relation w.r.t  ////
+////           spi_clk. Note: Previous version work only with     ////
+////           spi clock config = 0x2                             ////
+////        B. spi_oen generation fix for different spi mode      ////
+////        C. spi_csn de-assertion fix for different spi clk div ////
 ////                                                              ////
 //////////////////////////////////////////////////////////////////////
 ////                                                              ////
@@ -162,6 +164,10 @@ module qspim_top
     output logic [3:0]                   spi_oen
 );
 
+  parameter P_SINGLE = 2'b00;
+  parameter P_DOUBLE = 2'b01;
+  parameter P_QUAD   = 2'b10;
+  parameter P_QDDR   = 2'b11;
 
    
     logic                   [7:0] spi_clk_div      ;
@@ -316,10 +322,10 @@ ctech_delay_buf u_delay2_sdio3 (.X(spi_sdo3_d2),.A(spi_sdo3_d1));
 ctech_buf u_buf_sdio3    (.X(spi_sdo[3]),.A(spi_sdo3_d2));
 
 
-assign   #1 spi_oen[0] = !spi_en_tx;  // SPI_DIO0
-assign   #1 spi_oen[1] = !spi_en_tx;  // SPI_DIO1
-assign   #1 spi_oen[2] =  (spi_mode == 0) ? 1 'b0 : !spi_en_tx;   // HOLD
-assign   #1 spi_oen[3] =  (spi_mode == 0) ? 1 'b0 : !spi_en_tx;   // 
+assign   #1 spi_oen[0] = ((spi_mode == P_DOUBLE) || (spi_mode == P_QUAD) || (spi_mode == P_QDDR)) ? !spi_en_tx: 1'b0;  // SPI_DIO0
+assign   #1 spi_oen[1] = (spi_mode == P_SINGLE) ? 1'b1 : !spi_en_tx;  // SPI_DIO1
+assign   #1 spi_oen[2] =  ((spi_mode == P_QUAD) || (spi_mode == P_QDDR)) ? !spi_en_tx: 1'b0;   // HOLD
+assign   #1 spi_oen[3] =  ((spi_mode == P_QUAD) || (spi_mode == P_QDDR)) ? !spi_en_tx: 1'b0;   // 
 
 // spi clock skew control
 clk_skew_adjust u_skew_spi

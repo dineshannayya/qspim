@@ -591,7 +591,7 @@ parameter P_FSM_CR     = 4'b1100;  // COMMAND -> READ
              // If you see new command request, then abort the current request
 	      next_state = FSM_FLUSH;
 	  end else begin
-	     if (rx_done) begin
+	     if (rx_done && spi_rise) begin
 	         next_state = FSM_CS_DEASEERT;
              end 
 	  end
