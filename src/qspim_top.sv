@@ -90,6 +90,10 @@
 ////     1.1  - Feb 7, 2022, Dinesh A                             ////
 ////             CS0/CS1 will have Config support for FLASH SPI   ////
 ////             CS2/CS3 will have config support SRAM SPI        ////
+////     1.2  - Feb 19, 2022, Dinesh A                            ////
+////            Bug fix in spi rise and fall pulse relation w.r.t ////
+////            spi_clk. Note: Previous version work only with    ////
+////            spi clock config = 0x2                            ////
 ////                                                              ////
 //////////////////////////////////////////////////////////////////////
 ////                                                              ////

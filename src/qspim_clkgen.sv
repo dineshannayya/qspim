@@ -97,11 +97,11 @@ module qspim_clkgen
     	begin
     	   if(en) 
     	   begin
-    	      if(clk_cnt == sck_half_period) 
+    	      if(spi_fall) 
     	      begin
     		 spi_clk    <= 1'b0;
     	      end // if (clk_cnt == sck_half_period)
-    	      else if(clk_cnt == cfg_sck_period) begin
+    	      else if(spi_rise) begin
     		    spi_clk    <= 1'b1;
     	      end 
     	   end else begin
