@@ -739,7 +739,9 @@ end
       reg_rdata = '0;
       if(spim_reg_req) begin
           case(spim_reg_addr)
-            GLBL_CTRL:         reg_rdata[31:0] = {cfg_m0_fsm_reset,cfg_dpft_dis,14'h0,spi_clk_div,4'h0,cfg_cs_late,cfg_cs_early};
+            GLBL_CTRL:         reg_rdata[31:0] = {cfg_m0_fsm_reset,cfg_dpft_dis,10'h0,
+		                                  {res_fifo_full,res_fifo_empty,cmd_fifo_full,cmd_fifo_empty},
+						  spi_clk_div,4'h0,cfg_cs_late,cfg_cs_early};
 	    DMEM_CS0_RD_CTRL:  reg_rdata[31:0] = {cfg_m0_g0_rd_spi_seq   ,cfg_m0_g0_rd_dummy_cnt,cfg_m0_g0_rd_addr_cnt,
 		                                  cfg_m0_g0_rd_spi_switch,cfg_m0_g0_rd_spi_fmode,cfg_m0_g0_rd_spi_imode,
 						  cfg_m0_g0_rd_mode_reg  ,cfg_m0_g0_rd_cmd_reg};

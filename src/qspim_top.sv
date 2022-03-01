@@ -96,6 +96,9 @@
 ////           spi clock config = 0x2                             ////
 ////        B. spi_oen generation fix for different spi mode      ////
 ////        C. spi_csn de-assertion fix for different spi clk div ////
+////     1.3  - Mar 01, 2022, Dinesh A                            ////
+////            m1*res*fifo * m1*cmd*fifo status added into       ////
+////            global config Register                            ////
 ////                                                              ////
 //////////////////////////////////////////////////////////////////////
 ////                                                              ////
