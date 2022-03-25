@@ -325,10 +325,10 @@ ctech_delay_buf u_delay2_sdio3 (.X(spi_sdo3_d2),.A(spi_sdo3_d1));
 ctech_buf u_buf_sdio3    (.X(spi_sdo[3]),.A(spi_sdo3_d2));
 
 
-assign   #1 spi_oen[0] = ((spi_mode == P_DOUBLE) || (spi_mode == P_QUAD) || (spi_mode == P_QDDR)) ? !spi_en_tx: 1'b0;  // SPI_DIO0
-assign   #1 spi_oen[1] = (spi_mode == P_SINGLE) ? 1'b1 : !spi_en_tx;  // SPI_DIO1
-assign   #1 spi_oen[2] =  ((spi_mode == P_QUAD) || (spi_mode == P_QDDR)) ? !spi_en_tx: 1'b0;   // HOLD
-assign   #1 spi_oen[3] =  ((spi_mode == P_QUAD) || (spi_mode == P_QDDR)) ? !spi_en_tx: 1'b0;   // 
+assign   spi_oen[0] = ((spi_mode == P_DOUBLE) || (spi_mode == P_QUAD) || (spi_mode == P_QDDR)) ? !spi_en_tx: 1'b0;  // SPI_DIO0
+assign   spi_oen[1] = (spi_mode == P_SINGLE) ? 1'b1 : !spi_en_tx;  // SPI_DIO1
+assign   spi_oen[2] =  ((spi_mode == P_QUAD) || (spi_mode == P_QDDR)) ? !spi_en_tx: 1'b0;   // HOLD
+assign   spi_oen[3] =  ((spi_mode == P_QUAD) || (spi_mode == P_QDDR)) ? !spi_en_tx: 1'b0;   // 
 
 // spi clock skew control
 clk_skew_adjust u_skew_spi
