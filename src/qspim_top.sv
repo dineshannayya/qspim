@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 // SPDX-License-Identifier: Apache-2.0
-// SPDX-FileContributor: Created by Dinesh Annayya <dinesha@opencores.org>
+// SPDX-FileContributor: Created by Dinesh Annayya <dinesh.annayya@gmail.com>
 //
 //////////////////////////////////////////////////////////////////////
 ////                                                              ////
@@ -53,7 +53,7 @@
 ////    2. Add Pre-fetch feature for M0 Port                      ////
 ////                                                              ////
 ////  Author(s):                                                  ////
-////      - Dinesh Annayya, dinesha@opencores.org                 ////
+////      - Dinesh Annayya, dinesh.annayya@gmail.com              ////
 ////                                                              ////
 ////  Revision :                                                  ////
 ////     0.0  -  June 8, 2021                                     //// 
@@ -99,6 +99,11 @@
 ////     1.3  - Mar 01, 2022, Dinesh A                            ////
 ////            m1*res*fifo * m1*cmd*fifo status added into       ////
 ////            global config Register                            ////
+////     1.4  - Aug 29, 2022, Dinesh A                            ////
+////         A. Strap based CS#0 and CS#2 reset value change      ////
+////            Added                                             ////
+////         B. Initialization bypass added to take care of case  ////
+////            for when there is only local reboot               ////     
 ////                                                              ////
 //////////////////////////////////////////////////////////////////////
 ////                                                              ////
@@ -127,6 +132,18 @@
 ////                                                              ////
 //////////////////////////////////////////////////////////////////////
 
+/*******************************************************************
+     strap_flash [1:0] - QSPI Flash Mode Selection for CS#0
+                 2'b00 - Single
+                 2'b01 - Double
+                 2'b10 - Quad
+                 2'b11 - QDDR
+
+     strap_sram - QSPI SRAM Mode Selection for CS#2
+                 1'b0 - Single
+                 1'b1 - Quad
+
+*********************************************************************/
 
 
 module qspim_top
@@ -139,6 +156,10 @@ module qspim_top
 `endif
     input  logic                          mclk,
     input  logic                          rst_n,
+
+    input  logic   [1:0]                 strap_flash,
+    input  logic                         strap_sram,
+    input  logic                         cfg_init_bypass, // Bypass initialization
 
     input  logic   [3:0]                 cfg_cska_sp_co, // spi clock skew adjust
     input  logic   [3:0]                 cfg_cska_spi,
@@ -461,10 +482,15 @@ qspim_regs
     (
         .mclk                           (mclk                         ),
         .rst_n                          (rst_ss_n                     ),
-	.fast_sim_mode                  (1'b0                         ),
+
+         .cfg_init_bypass               (cfg_init_bypass              ),
+         .strap_flash                   (strap_flash                  ),
+         .strap_sram                    (strap_sram                   ),
+
+	    .fast_sim_mode                  (1'b0                         ),
 
         .spi_clk_div                    (spi_clk_div                  ),
-	.spi_init_done                  (spi_init_done                ),
+	    .spi_init_done                  (spi_init_done                ),
 
         .spi_debug                      (spi_debug                    ),
 

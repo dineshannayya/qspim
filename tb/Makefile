@@ -22,6 +22,9 @@
 # Paths
 export ROOT_DIR := $(shell pwd)
 
+### To Enable IVERILOG FST DUMP
+export IVERILOG_DUMPER = fst
+
 
 # Targets
 .PHONY: clean rtl gate help

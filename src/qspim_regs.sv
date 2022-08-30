@@ -72,6 +72,12 @@
 module qspim_regs #( parameter WB_WIDTH = 32, parameter CMD_FIFO_WD = 40) (
     input  logic                         mclk             ,
     input  logic                         rst_n            ,
+
+    input  logic                         cfg_init_bypass  ,
+    input  logic   [1:0]                 strap_flash      ,
+    input  logic                         strap_sram       ,
+
+
     input logic                          fast_sim_mode    , // Set 1 for simulation
 
     output logic                   [7:0] spi_clk_div      ,
@@ -206,14 +212,16 @@ parameter IMEM_RDATA         = 4'b1011;
 parameter SPI_STATUS         = 4'b1100;
 
 // Init FSM
-parameter SPI_INIT_PWUP      = 3'b000;
-parameter SPI_INIT_IDLE      = 3'b001;
-parameter SPI_INIT_CMD_WAIT  = 3'b010;
-parameter SPI_INIT_WREN_CMD  = 3'b011;
-parameter SPI_INIT_WREN_WAIT = 3'b100;
-parameter SPI_INIT_WRR_CMD   = 3'b101;
-parameter SPI_INIT_WRR_WAIT  = 3'b110;
-parameter SPI_INIT_WAIT      = 3'b111;
+parameter SPI_INIT_PWUP         = 4'b0000;
+parameter SPI_INIT_IDLE         = 4'b0001;
+parameter SPI_INIT_CMD_WAIT     = 4'b0010;
+parameter SPI_INIT_WREN_CMD     = 4'b0011;
+parameter SPI_INIT_WREN_WAIT    = 4'b0100;
+parameter SPI_INIT_WRR_CMD      = 4'b0101;
+parameter SPI_INIT_WRR_WAIT     = 4'b0110;
+parameter SPI_SRAM_STRAP_CHECK  = 4'b0111;
+parameter SPI_SRAM_ESQI_WAIT    = 4'b1000;
+parameter SPI_INIT_WAIT         = 4'b1001;
 
 /*************************************************************
 *  SPI FSM State Control
@@ -277,14 +285,24 @@ parameter P_FSM_CR     = 4'b1100;  // COMMAND -> READ
   parameter P_MODE_SWITCH_AT_ADDR  = 2'b01;
   parameter P_MODE_SWITCH_AT_DATA  = 2'b10;
 
-  parameter P_FLASH_QOR = 8'h6B;
-  parameter P_FLASH_QIOR = 8'hEB;
+  parameter P_FLASH_READ    = 8'h03;  // Normal Read
+  parameter P_FLASH_FREAD   = 8'h0B;  // Fast Read
+  parameter P_FLASH_DOR     = 8'h3B;  // Dual Read
+  parameter P_FLASH_QOR     = 8'h6B;  // Quad Read
+  parameter P_FLASH_DIOR    = 8'hBB;  // Dual I/O Read
+  parameter P_FLASH_QIOR    = 8'hEB;  // Quad IO Read
+  parameter P_FLASH_DDRFR   = 8'h0D;  // DDR Read
+  parameter P_FLASH_DDRDIOR = 8'hBD;  // DDR Dual I/O Read
+  parameter P_FLASH_DDRQIOR = 8'hED;  // DDR Quad I/O Read
+  
   parameter P_FLASH_RES = 8'hAB;
   parameter P_FLASH_WEN = 8'h06;
   parameter P_FLASH_WRR = 8'h01;
 
-  parameter P_SRAM_QOR = 8'h03;
-  parameter P_SRAM_QOW = 8'h02;
+  parameter P_SRAM_READ  = 8'h03;
+  parameter P_SRAM_WRITE = 8'h02;
+  parameter P_SRAM_ESDI  = 8'h3B; // Enter SDI (Dual)mode
+  parameter P_SRAM_ESQI  = 8'h38; // Enter SQI (Quad) mode
 
 
   parameter P_BYTE_1   = 4'b0000;
@@ -306,7 +324,7 @@ parameter P_FSM_CR     = 4'b1100;  // COMMAND -> READ
 //---------------------------------------------------------
 // Variable declartion
 // -------------------------------------------------------
-logic   [2:0]        spi_init_state ;
+logic   [3:0]        spi_init_state ;
 logic                spim_reg_req_f ; 
 
 logic [3:0]          cfg_m1_cs_reg    ;  // Chip select
@@ -338,7 +356,7 @@ logic [31:0]          spim_m1_rdata   ;
 logic                 spim_m1_ack     ;
 logic                 spim_m1_rrdy    ;
 logic                 spim_m1_wrdy    ;
-logic  [9:0]          spi_delay_cnt  ;
+logic  [15:0]         spi_delay_cnt  ;
 logic                 spim_fifo_rdata_req  ;
 logic                 spim_fifo_wdata_req  ;
 
@@ -384,8 +402,14 @@ end
   // 3. WRITE CONFIG Reg - WRR (0x01) - Set Qaud Mode
   // --------------------------------------------
   
-  logic  [9:0]          cfg_exit_cnt  ;
-  assign cfg_exit_cnt = (fast_sim_mode) ? 100: 1000;
+  logic  [15:0]          cfg_entry_cnt  ;
+  logic  [15:0]          cfg_exit_cnt  ;
+  //--------------------------------------------
+  // With Assuming 100Mhz clock, Entry wait 50us 
+  // and exit wait for 5us assumed
+  //--------------------------------------------
+  assign cfg_entry_cnt = (fast_sim_mode) ? 100: 5000;
+  assign cfg_exit_cnt  = (fast_sim_mode) ? 100: 500;
 
   integer byte_index;
   always_ff @(negedge rst_n or posedge mclk) begin
@@ -393,14 +417,34 @@ end
       cfg_m0_fsm_reset      <= 'h0;
       cfg_dpft_dis          <= 'h0;
 
-      cfg_m0_g0_rd_cmd_reg        <= P_FLASH_QIOR;
+      cfg_m0_g0_rd_cmd_reg        <= (strap_flash == P_SINGLE) ? P_FLASH_FREAD   :
+                                     (strap_flash == P_DOUBLE) ? P_FLASH_DOR     :
+                                     (strap_flash == P_QUAD)   ? P_FLASH_QIOR    : 
+                                     (strap_flash == P_QDDR)   ? P_FLASH_DDRQIOR : 'h0;
       cfg_m0_g0_rd_mode_reg       <= 'h0;
-      cfg_m0_g0_rd_spi_imode      <= P_QUAD;
-      cfg_m0_g0_rd_spi_fmode      <= P_QUAD;
-      cfg_m0_g0_rd_spi_switch     <= P_MODE_SWITCH_AT_ADDR;
+      cfg_m0_g0_rd_spi_imode      <= (strap_flash == P_SINGLE) ? P_SINGLE              :
+                                     (strap_flash == P_DOUBLE) ? P_SINGLE              :
+                                     (strap_flash == P_QUAD)   ? P_SINGLE              : 
+                                     (strap_flash == P_QDDR)   ? P_SINGLE              : 'h0;
+
+      cfg_m0_g0_rd_spi_fmode      <= (strap_flash == P_SINGLE) ? P_SINGLE              :
+                                     (strap_flash == P_DOUBLE) ? P_DOUBLE              :
+                                     (strap_flash == P_QUAD)   ? P_QUAD                : 
+                                     (strap_flash == P_QDDR)   ? P_QDDR                : 'h0;
+
+      cfg_m0_g0_rd_spi_switch     <= (strap_flash == P_SINGLE) ? P_MODE_SWITCH_IDLE    :
+                                     (strap_flash == P_DOUBLE) ? P_MODE_SWITCH_AT_DATA :
+                                     (strap_flash == P_QUAD)   ? P_MODE_SWITCH_AT_ADDR : 
+                                     (strap_flash == P_QDDR)   ? P_MODE_SWITCH_AT_ADDR : 'h0;
       cfg_m0_g0_rd_addr_cnt[1:0]  <= P_BYTE_3;
-      cfg_m0_g0_rd_dummy_cnt[3:0] <= P_BYTE_2;
-      cfg_m0_g0_rd_spi_seq[3:0]   <= P_FSM_CAMDR;
+      cfg_m0_g0_rd_dummy_cnt[3:0] <= (strap_flash == P_SINGLE) ? P_BYTE_1       :
+                                     (strap_flash == P_DOUBLE) ? P_BYTE_1       :
+                                     (strap_flash == P_QUAD)   ? P_BYTE_2       : 
+                                     (strap_flash == P_QDDR)   ? P_BYTE_5       : 'h0;
+      cfg_m0_g0_rd_spi_seq[3:0]   <= (strap_flash == P_SINGLE) ? P_FSM_CADR     :
+                                     (strap_flash == P_DOUBLE) ? P_FSM_CADR     :
+                                     (strap_flash == P_QUAD)   ? P_FSM_CAMDR    : 
+                                     (strap_flash == P_QDDR)   ? P_FSM_CAMDR    : 'h0;
 
       cfg_m0_g0_wr_cmd_reg        <= P_FLASH_QIOR;
       cfg_m0_g0_wr_mode_reg       <= 'h0;
@@ -411,19 +455,26 @@ end
       cfg_m0_g0_wr_dummy_cnt[3:0] <= P_BYTE_2;
       cfg_m0_g0_wr_spi_seq[3:0]   <= P_FSM_CAMDR;
 
-      cfg_m0_g1_rd_cmd_reg        <= P_SRAM_QOR;
+      cfg_m0_g1_rd_cmd_reg        <= P_SRAM_READ;
       cfg_m0_g1_rd_mode_reg       <= 'h0;
-      cfg_m0_g1_rd_spi_imode      <= P_QUAD;
-      cfg_m0_g1_rd_spi_fmode      <= P_QUAD;
+      cfg_m0_g1_rd_spi_imode      <= (strap_sram == 1'b0) ? P_SINGLE   :
+                                     (strap_sram == 1'b1) ? P_QUAD     : 'h0; 
+
+      cfg_m0_g1_rd_spi_fmode      <= (strap_sram == 1'b0) ? P_SINGLE   :
+                                     (strap_sram == 1'b1) ? P_QUAD     : 'h0; 
+
       cfg_m0_g1_rd_spi_switch     <= P_MODE_SWITCH_IDLE;
+
       cfg_m0_g1_rd_addr_cnt[1:0]  <= P_BYTE_3;
       cfg_m0_g1_rd_dummy_cnt[3:0] <= P_BYTE_1;
       cfg_m0_g1_rd_spi_seq[3:0]   <= P_FSM_CADR;
 
-      cfg_m0_g1_wr_cmd_reg        <= P_SRAM_QOW;
+      cfg_m0_g1_wr_cmd_reg        <= P_SRAM_WRITE;
       cfg_m0_g1_wr_mode_reg       <= 'h0;
-      cfg_m0_g1_wr_spi_imode      <= P_QUAD;
-      cfg_m0_g1_wr_spi_fmode      <= P_QUAD;
+      cfg_m0_g1_wr_spi_imode      <= (strap_sram == 1'b0) ? P_SINGLE  :
+                                     (strap_sram == 1'b1) ? P_QUAD    : 'h0; 
+      cfg_m0_g1_wr_spi_fmode      <= (strap_sram == 1'b0) ? P_SINGLE  :
+                                     (strap_sram == 1'b1) ? P_QUAD    : 'h0; 
       cfg_m0_g1_wr_spi_switch     <= P_MODE_SWITCH_IDLE;
       cfg_m0_g1_wr_addr_cnt[1:0]  <= P_BYTE_3;
       cfg_m0_g1_wr_dummy_cnt[3:0] <= P_BYTE_1;
@@ -468,16 +519,16 @@ end
       cfg_m0_cs3_amask       <= 8'hF0;
     end else begin 
         spim_reg_req_f        <= spim_reg_req; // Needed for finding Req Edge
-        if (spi_init_done == 0) begin
+        if(cfg_init_bypass) spi_init_done <= 1'b1;
+        else if (spi_init_done == 0) begin
           case(spi_init_state)
 
               //----------------------------------------------
-              // SPI MEMORY Need minimum 5Us after power up
-              // With 100Mhz, 10ns translated to 500 cycle
-              // We are waiting 1000 cycle
+              // SPI MEMORY Need minimum 50Us after power up
+              // With 100Mhz, 10ns translated to 5000 cycle
               // ---------------------------------------------
               SPI_INIT_PWUP:begin
-                 if(spi_delay_cnt == cfg_exit_cnt) begin
+                 if(spi_delay_cnt == cfg_entry_cnt) begin
                      spi_init_state   <=  SPI_INIT_IDLE;
            	 end else begin
            	     spi_delay_cnt <= spi_delay_cnt+1;
@@ -529,7 +580,16 @@ end
               begin
                  if(spim_m1_ack)   begin
                     cfg_m1_req      <= 1'b0;
-                    spi_init_state    <=  SPI_INIT_WRR_CMD;
+                    //---------------------------------------------------------
+                    // For SPI FLASH Memory QUAD and QDDR Mode, we need to enable
+                    // enable set cr1[1] = 1 to enable. So we need configure it
+                    // through WRR command
+                    //-----------------------------------------------------------
+                    if((strap_flash == P_QUAD) || (strap_flash == P_QDDR)) begin
+                       spi_init_state    <=  SPI_INIT_WRR_CMD;
+                    end else begin
+                       spi_init_state    <=  SPI_SRAM_STRAP_CHECK;
+                    end
                  end
               end
               SPI_INIT_WRR_CMD:
@@ -553,7 +613,42 @@ end
               SPI_INIT_WRR_WAIT:
               begin
                  if(spim_m1_ack)   begin
-		    spi_delay_cnt    <= 'h0;
+		            spi_delay_cnt    <= 'h0;
+                    cfg_m1_wrdy      <= 1'b0;
+                    cfg_m1_req       <= 1'b0;
+                    spi_init_state   <=  SPI_SRAM_STRAP_CHECK;
+                 end
+              end
+              SPI_SRAM_STRAP_CHECK: // Check SRAM STRAP
+              begin
+                 //-----------------------------------------------------------------------
+                 // Check the SPI SRAM Mode, On Power up SRAM comes up in Single SPI Mode
+                 // If we need QUAD Mode, We need to issue ESQI command
+                 //-----------------------------------------------------------------------
+                 if(strap_sram == 1'b1) begin // If SRAM STRAP is QUAD Mode
+                    cfg_m1_cs_reg        <= P_CS2;
+                    cfg_m1_spi_imode     <= P_SINGLE;
+                    cfg_m1_spi_fmode     <= P_SINGLE;
+                    cfg_m1_spi_seq[3:0]  <= P_FSM_C;
+                    cfg_m1_spi_switch    <= P_MODE_SWITCH_IDLE;
+                    cfg_m1_cmd_reg       <= P_SRAM_ESQI;
+                    cfg_m1_mode_reg      <= 'h0; 
+                    cfg_m1_addr_cnt[1:0] <= 'h0; 
+                    cfg_m1_dummy_cnt[3:0]<= 'h0; 
+                    cfg_m1_data_cnt[7:0] <= 'h0; 
+                    cfg_m1_addr          <= 'h0; 
+                    cfg_m1_wrdy          <= 1'b1;
+                    cfg_m1_wdata         <= 'h0; 
+                    cfg_m1_req           <= 'h1;
+                    spi_init_state       <=  SPI_SRAM_ESQI_WAIT;
+                 end else begin
+                    spi_init_state       <=  SPI_INIT_WAIT;
+                 end
+              end
+              SPI_SRAM_ESQI_WAIT:
+              begin
+                 if(spim_m1_ack)   begin
+		            spi_delay_cnt    <= 'h0;
                     cfg_m1_wrdy      <= 1'b0;
                     cfg_m1_req       <= 1'b0;
                     spi_init_state   <=  SPI_INIT_WAIT;

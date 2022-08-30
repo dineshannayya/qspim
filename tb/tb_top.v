@@ -187,6 +187,19 @@ parameter P_DOUBLE = 2'b01;
 parameter P_QUAD   = 2'b10;
 parameter P_QDDR   = 2'b11;
 
+parameter S_SINGLE = 1'b0; // SRAM Single
+parameter S_QUAD   = 1'b1; // SRAM Quad
+
+parameter P_FLASH_READ    = 8'h03;  // Normal Read
+parameter P_FLASH_FREAD   = 8'h0B;  // Fast Read
+parameter P_FLASH_DOR     = 8'h3B;  // Dual Read
+parameter P_FLASH_QOR     = 8'h6B;  // Quad Read
+parameter P_FLASH_DIOR    = 8'hBB;  // Dual I/O Read
+parameter P_FLASH_QIOR    = 8'hEB;  // Quad IO Read
+parameter P_FLASH_DDRFR   = 8'h0D;  // DDR Read
+parameter P_FLASH_DDRDIOR = 8'hBD;  // DDR Dual I/O Read
+parameter P_FLASH_DDRQIOR = 8'hED;  // DDR Quad I/O Read
+
 	reg clock;
 	reg wb_rst_i;
 
@@ -207,6 +220,9 @@ parameter P_QDDR   = 2'b11;
 	reg [31:0]  data_array [0 : 511]; // Data Array
 	reg         test_fail;
 	reg [31:0] read_data;
+
+    reg  [1:0]  strap_flash;
+    reg         strap_sram;
 
         wire flash_clk;
         wire [3:0] spi_csb;
@@ -248,6 +264,8 @@ parameter P_QDDR   = 2'b11;
        `endif
 
 	initial begin
+        strap_flash = 2'b11;
+        strap_sram  = 1'b1;
 		test_fail = 0;
 		wb_rst_i = 1'b1;
 		wait(u_spi_flash0_256mb.PoweredUp==1);
@@ -255,7 +273,190 @@ parameter P_QDDR   = 2'b11;
 		#100;
 		wb_rst_i = 1'b0;	    	// Release reset
 
-		$dumpoff;
+		$display("############################################################");
+		$display("  Flash System Strap Testing....Step-1: strap_flash:P_SINGLE ");
+		$display("############################################################");
+        #1000 wb_rst_i = 1;
+        #1000 strap_flash = P_SINGLE;
+              strap_sram  = S_SINGLE;
+
+        #1000 wb_rst_i = 0;
+	     repeat (200) @(posedge clock);
+         if(u_top.cfg_m0_g0_rd_cmd_reg != P_FLASH_FREAD) begin
+            $display("ERROR: Wrong Command Found Exp: %x Rxd:%x", P_FLASH_FREAD,u_top.cfg_m0_g0_rd_cmd_reg);
+            test_fail = 1;
+         end
+		    wb_user_core_read_check(32'h00000200,read_data,32'h00000093);
+		    wb_user_core_read_check(32'h00000204,read_data,32'h00000113);
+		    wb_user_core_read_check(32'h00000208,read_data,32'h00000193);
+		    wb_user_core_read_check(32'h0000020C,read_data,32'h00000213);
+		    wb_user_core_read_check(32'h00000210,read_data,32'h00000293);
+		    wb_user_core_read_check(32'h00000214,read_data,32'h00000313);
+		    wb_user_core_read_check(32'h00000218,read_data,32'h00000393);
+		    wb_user_core_read_check(32'h0000021C,read_data,32'h00000413);
+		    wb_user_core_read_check(32'h00000300,read_data,32'h0005A023);
+		    wb_user_core_read_check(32'h00000304,read_data,32'h9DE30591);
+		    wb_user_core_read_check(32'h00000308,read_data,32'h02B7FEE5);
+		    wb_user_core_read_check(32'h0000030C,read_data,32'h43050049);
+		    wb_user_core_read_check(32'h00000310,read_data,32'h0062A023);
+		    wb_user_core_read_check(32'h00000314,read_data,32'h004902B7);
+		    wb_user_core_read_check(32'h00000318,read_data,32'h03130291);
+		    wb_user_core_read_check(32'h0000031C,read_data,32'ha0230630);
+       
+		$display("############################################################");
+		$display("  Flash System Strap Testing....Step-2: strap_flash:P_DOUBLE ");
+		$display("############################################################");
+        #1000 wb_rst_i = 1;
+        #1000 strap_flash = P_DOUBLE;
+              strap_sram  = S_SINGLE;
+
+        #1000 wb_rst_i = 0;
+	     repeat (200) @(posedge clock);
+         if(u_top.cfg_m0_g0_rd_cmd_reg != P_FLASH_DOR) begin
+            $display("ERROR: Wrong Command Found Exp: %x Rxd:%x", P_FLASH_DOR,u_top.cfg_m0_g0_rd_cmd_reg);
+            test_fail = 1;
+         end
+		    wb_user_core_read_check(32'h00000200,read_data,32'h00000093);
+		    wb_user_core_read_check(32'h00000204,read_data,32'h00000113);
+		    wb_user_core_read_check(32'h00000208,read_data,32'h00000193);
+		    wb_user_core_read_check(32'h0000020C,read_data,32'h00000213);
+		    wb_user_core_read_check(32'h00000210,read_data,32'h00000293);
+		    wb_user_core_read_check(32'h00000214,read_data,32'h00000313);
+		    wb_user_core_read_check(32'h00000218,read_data,32'h00000393);
+		    wb_user_core_read_check(32'h0000021C,read_data,32'h00000413);
+		    wb_user_core_read_check(32'h00000300,read_data,32'h0005A023);
+		    wb_user_core_read_check(32'h00000304,read_data,32'h9DE30591);
+		    wb_user_core_read_check(32'h00000308,read_data,32'h02B7FEE5);
+		    wb_user_core_read_check(32'h0000030C,read_data,32'h43050049);
+		    wb_user_core_read_check(32'h00000310,read_data,32'h0062A023);
+		    wb_user_core_read_check(32'h00000314,read_data,32'h004902B7);
+		    wb_user_core_read_check(32'h00000318,read_data,32'h03130291);
+		    wb_user_core_read_check(32'h0000031C,read_data,32'ha0230630);
+
+		$display("############################################################");
+		$display("  Flash System Strap Testing....Step-3: strap_flash:P_QUAD ");
+		$display("############################################################");
+	     repeat (200) @(posedge clock);
+        #1000 wb_rst_i = 1;
+        #1000 strap_flash = P_QUAD;
+              strap_sram  = S_SINGLE;
+
+        #1000 wb_rst_i = 0;
+	     repeat (200) @(posedge clock);
+         if(u_top.cfg_m0_g0_rd_cmd_reg != P_FLASH_QIOR) begin
+            $display("ERROR: Wrong Command Found Exp: %x Rxd:%x", P_FLASH_QIOR,u_top.cfg_m0_g0_rd_cmd_reg);
+            test_fail = 1;
+         end
+		    wb_user_core_read_check(32'h00000200,read_data,32'h00000093);
+		    wb_user_core_read_check(32'h00000204,read_data,32'h00000113);
+		    wb_user_core_read_check(32'h00000208,read_data,32'h00000193);
+		    wb_user_core_read_check(32'h0000020C,read_data,32'h00000213);
+		    wb_user_core_read_check(32'h00000210,read_data,32'h00000293);
+		    wb_user_core_read_check(32'h00000214,read_data,32'h00000313);
+		    wb_user_core_read_check(32'h00000218,read_data,32'h00000393);
+		    wb_user_core_read_check(32'h0000021C,read_data,32'h00000413);
+		    wb_user_core_read_check(32'h00000300,read_data,32'h0005A023);
+		    wb_user_core_read_check(32'h00000304,read_data,32'h9DE30591);
+		    wb_user_core_read_check(32'h00000308,read_data,32'h02B7FEE5);
+		    wb_user_core_read_check(32'h0000030C,read_data,32'h43050049);
+		    wb_user_core_read_check(32'h00000310,read_data,32'h0062A023);
+		    wb_user_core_read_check(32'h00000314,read_data,32'h004902B7);
+		    wb_user_core_read_check(32'h00000318,read_data,32'h03130291);
+		    wb_user_core_read_check(32'h0000031C,read_data,32'ha0230630);
+		
+        $display("############################################################");
+		$display("  Flash System Strap Testing....Step-4: strap_flash:P_QDDR ");
+		$display("############################################################");
+	     repeat (200) @(posedge clock);
+        #1000 wb_rst_i = 1;
+        #1000 strap_flash = P_QDDR;
+              strap_sram  = S_SINGLE;
+
+        #1000 wb_rst_i = 0;
+	     repeat (200) @(posedge clock);
+         if(u_top.cfg_m0_g0_rd_cmd_reg != P_FLASH_DDRQIOR) begin
+            $display("ERROR: Wrong Command Found Exp: %x Rxd:%x", P_FLASH_DDRQIOR,u_top.cfg_m0_g0_rd_cmd_reg);
+            test_fail = 1;
+         end
+		    wb_user_core_read_check(32'h00000200,read_data,32'h00000093);
+		    wb_user_core_read_check(32'h00000204,read_data,32'h00000113);
+		    wb_user_core_read_check(32'h00000208,read_data,32'h00000193);
+		    wb_user_core_read_check(32'h0000020C,read_data,32'h00000213);
+		    wb_user_core_read_check(32'h00000210,read_data,32'h00000293);
+		    wb_user_core_read_check(32'h00000214,read_data,32'h00000313);
+		    wb_user_core_read_check(32'h00000218,read_data,32'h00000393);
+		    wb_user_core_read_check(32'h0000021C,read_data,32'h00000413);
+		    wb_user_core_read_check(32'h00000300,read_data,32'h0005A023);
+		    wb_user_core_read_check(32'h00000304,read_data,32'h9DE30591);
+		    wb_user_core_read_check(32'h00000308,read_data,32'h02B7FEE5);
+		    wb_user_core_read_check(32'h0000030C,read_data,32'h43050049);
+		    wb_user_core_read_check(32'h00000310,read_data,32'h0062A023);
+		    wb_user_core_read_check(32'h00000314,read_data,32'h004902B7);
+		    wb_user_core_read_check(32'h00000318,read_data,32'h03130291);
+		    wb_user_core_read_check(32'h0000031C,read_data,32'ha0230630);
+
+        $display("############################################################");
+		$display("  SRAM System Strap Testing....Step-1: strap_flash:S_SINGLE ");
+		$display("############################################################");
+	     repeat (200) @(posedge clock);
+        #1000 wb_rst_i = 1;
+        #1000 strap_flash = P_QDDR;
+              strap_sram  = S_SINGLE;
+
+        #1000 wb_rst_i = 0;
+	     repeat (200) @(posedge clock);
+		data_array[10'h0]    = 32'h00112233;
+		data_array[10'h1]    = 32'h44556677;
+		data_array[10'h2]    = 32'h8899AABB;
+		data_array[10'h3]    = 32'hCCDDEEFF;
+		data_array[10'h4]    = 32'h00001111;
+		data_array[10'h5]    = 32'h22223333;
+		data_array[10'h6]    = 32'h44445555;
+		data_array[10'h7]    = 32'h66667777;
+		wb_user_core_bwrite(32'h08002000,10'h8);
+		wb_user_core_bread_check(32'h08002000,10'h8);
+
+        $display("############################################################");
+		$display("  SRAM System Strap Testing....Step-2: strap_sram:S_QUAD ");
+		$display("############################################################");
+	     repeat (200) @(posedge clock);
+        #1000 wb_rst_i = 1;
+        #1000 strap_flash = P_QDDR;
+              strap_sram  = S_QUAD;
+
+        #1000 wb_rst_i = 0;
+	     repeat (200) @(posedge clock);
+		data_array[10'h0]    = 32'h00112233;
+		data_array[10'h1]    = 32'h44556677;
+		data_array[10'h2]    = 32'h8899AABB;
+		data_array[10'h3]    = 32'hCCDDEEFF;
+		data_array[10'h4]    = 32'h00001111;
+		data_array[10'h5]    = 32'h22223333;
+		data_array[10'h6]    = 32'h44445555;
+		data_array[10'h7]    = 32'h66667777;
+		wb_user_core_bwrite(32'h08003000,10'h8);
+		wb_user_core_bread_check(32'h08003000,10'h8);
+
+        $display("############################################################");
+		$display("  End of Strap Testing                                     ");
+		$display("############################################################");
+       //------------------ End of Strap Testing ------------------------------------------
+
+	     repeat (200) @(posedge clock);
+        #1000 wb_rst_i = 1;
+        #1000 strap_flash = P_QDDR;
+              strap_sram  = S_SINGLE;
+
+        #1000 wb_rst_i = 0;
+
+		// CS#2 Switch From QSPI to SSPI Mode
+		wb_user_core_write(`QSPIM_IMEM_CTRL1,{16'h0,1'b0,1'b0,4'b0000,P_MODE_SWITCH_IDLE,P_QUAD,P_QUAD,4'b0100});
+		wb_user_core_write(`QSPIM_IMEM_CTRL2,{8'h0,2'b00,2'b00,P_FSM_C,8'h00,8'hFF});
+		wb_user_core_write(`QSPIM_IMEM_WDATA,32'h0);
+
+        $display("############################################################");
+		$display("  CS#2 SRAM INDIRECT READ ACCESS in SSPI Mode              ");
+		$display("############################################################");
 	        repeat (200) @(posedge clock);
 		// CS#2 SSPI Indirect RAM READ ACCESS-
 		wb_user_core_write(`QSPIM_IMEM_CTRL1,{16'h0,1'b0,1'b0,4'b0000,P_MODE_SWITCH_IDLE,P_SINGLE,P_SINGLE,4'b0100});
@@ -297,6 +498,9 @@ parameter P_QDDR   = 2'b11;
 		wb_user_core_read_check(`QSPIM_IMEM_RDATA,read_data,32'hCCDDEEFF);
 
 
+        $display("############################################################");
+		$display("  CS#2 SRAM INDIRECT READ ACCESS in QSPI Mode              ");
+		$display("############################################################");
 		// CS#2 Switch to QSPI Mode
 		wb_user_core_write(`QSPIM_IMEM_CTRL1,{16'h0,1'b0,1'b0,4'b0000,P_MODE_SWITCH_IDLE,P_SINGLE,P_SINGLE,4'b0100});
 		wb_user_core_write(`QSPIM_IMEM_CTRL2,{8'h0,2'b00,2'b00,P_FSM_C,8'h00,8'h38});
@@ -326,10 +530,9 @@ parameter P_QDDR   = 2'b11;
 		wb_user_core_write(`QSPIM_IMEM_CTRL1,{16'h0,1'b0,1'b0,4'b0000,P_MODE_SWITCH_IDLE,P_QUAD,P_QUAD,4'b0100});
 		wb_user_core_write(`QSPIM_IMEM_CTRL2,{8'h0,2'b00,2'b00,P_FSM_C,8'h00,8'hFF});
 		wb_user_core_write(`QSPIM_IMEM_WDATA,32'h0);
-		///////////////////// End of CS#1 Indirect Memory Access Testing ///////////////////////////////////
-		
+		///////////////////// End of CS#2 Indirect SRAM Memory Access Testing ///////////////////////////////////
 		$display("#############################################");
-		$display("  Page Read through Direct Burst Access in SSPI Mode       ");
+		$display("  CS#2: Page Read through Direct Burst Access in SSPI Mode       ");
 		$display("#############################################");
 		wb_user_core_write(`QSPIM_DMEM_G1_WR_CTRL,{P_FSM_CAW, 4'b0000,2'b10,P_MODE_SWITCH_IDLE,P_SINGLE,P_SINGLE,8'h00,8'h02});
 		wb_user_core_write(`QSPIM_DMEM_G1_RD_CTRL,{P_FSM_CADR,4'b0000,2'b10,P_MODE_SWITCH_IDLE,P_SINGLE,P_SINGLE,8'h00,8'h03});
@@ -1561,6 +1764,10 @@ qspim_top u_top(
     `endif
     .mclk        (clock),  // System clock
     .rst_n       (!wb_rst_i),  // Regular Reset signal
+
+    .cfg_init_bypass (1'b0),
+    .strap_flash (strap_flash),
+    .strap_sram  (strap_sram),
 
     .cfg_cska_sp_co  ('h0), // spi clock skew adjust
     .cfg_cska_spi    ('h0),

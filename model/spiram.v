@@ -185,12 +185,12 @@ module spiram #(
 
 		   	if (bytecount >= 4 && spi_cmd ==8'h03) begin // Data Read Phase
 		   		buffer = memory[spi_addr];
-				//$display("%m: Read Memory Address: %x Data: %x",spi_addr,buffer);
+				$display("%m: Read Memory Address: %x Data: %x",spi_addr,buffer);
 		   		spi_addr = spi_addr + 1;
 		   	end
 		   	if (bytecount > 4 && spi_cmd ==8'h02) begin // Data Write Phase
 		   		memory[spi_addr] = buffer;
-				//$display("%m: Write Memory Address: %x Data: %x",spi_addr,buffer);
+				$display("%m: Write Memory Address: %x Data: %x",spi_addr,buffer);
 		   		spi_addr = spi_addr + 1;
 		   	end
 		   end
