@@ -15,97 +15,104 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Created by Dinesh Annayya <dinesh.annayya@gmail.com>
 //
-//////////////////////////////////////////////////////////////////////
-////                                                              ////
-////  SPI Master Top Module                                       ////
-////                                                              ////
-////  This file is part of the YIFive cores project               ////
-////  https://github.com/dineshannayya/yifive_r0.git              ////
-////  http://www.opencores.org/cores/yifive/                      ////
-////                                                              ////
-////  Description                                                 ////
-////     SPI Master Top module                                    ////
-////     There are two seperate Data path managed here            ////
-////     with seperate command and response memory                ////
-////     Master-0 : This is targetted for CORE IMEM request       ////
-////                and expect only Read access                   ////
-////     Master-1: This is targetted to CORE DMEM or              ////
-////               Indirect Memory access, Both Write and Read    ////
-////               accesss are supported.                         ////
-////               Upto 255 Byte Read/Write Burst supported       ////
-////    Limitation:                                               ////
-////       1.  Write/Read FIFO Abort case not managed M1 port,    ////
-////           expect user to clearly close the busrt request     ////
-////       2.  Wishbone Request abort not yet supported.          ////
-////       3.  Write access through M0 Port not supported         ////
-////       4.  When Pre fetch feature used and both port m0 and   ////
-////           m1 used, user need to make sure that data pre fetch////
-////           count is withing 8DW, less Read path can hang due  ////
-////           to response FIFO full from one master port         ////
-////                                                              ////
-////      Assumed Default Direct Address CS Mapping               ////
-////      0x0000_0000 to 0x03FF_FFFF - CS-0 (64MB)                ////
-////      0x0400_0000 to 0x07FF_FFFF - CS-1 (64MB)                ////
-////      0x0800_0000 to 0x0BFF_FFFF - CS-2 (64MB)                ////
-////      0x0C00_0000 to 0x0FFF_FFFF - CS-3 (64MB)                ////
-////  To Do:                                                      ////
-////    1. Add support for WishBone request timout                ////
-////    2. Add Pre-fetch feature for M0 Port                      ////
-////                                                              ////
-////  Author(s):                                                  ////
-////      - Dinesh Annayya, dinesh.annayya@gmail.com              ////
-////                                                              ////
-////  Revision :                                                  ////
-////     0.0  -  June 8, 2021                                     //// 
-////     0.1  - June 25, 2021                                     ////
-////            Pad logic is brought inside the block to avoid    ////
-////            logic at digital core level for caravel project   ////
-////     0.2  - July 6, 2021                                      ////
-////            Added Hold fix cell for SPI data out signal to    ////
-////            met interface hold                                ////
-////     0.3  - July 13, 2021                                     ////
-////            Data Prefetch feature added in M0 port, If Only   ////
-////            M0 Read used, then Prefetch read can be 255 Byte, ////
-////            But if the Both M0 and M1 read access enabled,    ////
-////            then user need to make sure that M0 Prefetch is   ////
-////            with in 8DW or 32 Byte, else there is chance      ////
-////            data path can hang due to response FIFO full due  ////
-////            to partial reading of data                        ////
-////     0.4  -  July 26, 2021                                    ////
-////             QDDR (0xED) supported is added                   ////
-////     0.5  -  Nov 6, 2021                                      ////
-////             Clock Skew Moves inside the block                ////
-////     0.6  -  Jan 13, 2022                                     ////
-////             All CS# brougt out from block                    ////
-////     0.7  -  Jan 14, 2022                                     ////
-////             1. Changed Dummy to 2 to 4 bit                   ////
-////             2. CS Address Map and Mask Reg added for Direct  ////
-////                access mode                                   ////
-////             3. Seperated spi init and spi final mode config  ////
-////                cfg_m*_spi_imode & cfg_m*_spi_fmode           ////
-////                *_imode loaded at init place of CS Assertion  ////
-////                & *_fmode loaded on switching place           //// 
-////     1.0  - Jan 25, 2022, Dinesh A                            ////
-////             Direct memory Burst Mode support is added        ////
-////     1.1  - Feb 7, 2022, Dinesh A                             ////
-////             CS0/CS1 will have Config support for FLASH SPI   ////
-////             CS2/CS3 will have config support SRAM SPI        ////
-////     1.2  - Feb 19, 2022, Dinesh A                            ////
-////        A. Bug fix in spi rise and fall pulse relation w.r.t  ////
-////           spi_clk. Note: Previous version work only with     ////
-////           spi clock config = 0x2                             ////
-////        B. spi_oen generation fix for different spi mode      ////
-////        C. spi_csn de-assertion fix for different spi clk div ////
-////     1.3  - Mar 01, 2022, Dinesh A                            ////
-////            m1*res*fifo * m1*cmd*fifo status added into       ////
-////            global config Register                            ////
-////     1.4  - Aug 29, 2022, Dinesh A                            ////
-////         A. Strap based CS#0 and CS#2 reset value change      ////
-////            Added                                             ////
-////         B. Initialization bypass added to take care of case  ////
-////            for when there is only local reboot               ////     
-////                                                              ////
-//////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////////////
+////                                                                                                   ////
+////  SPI Master Top Module                                                                            ////
+////                                                                                                   ////
+////  This file is part of the YIFive cores project                                                    ////
+////  https://github.com/dineshannayya/yifive_r0.git                                                   ////
+////  http://www.opencores.org/cores/yifive/                                                           ////
+////                                                                                                   ////
+////  Description                                                                                      ////
+////     SPI Master Top module                                                                         ////
+////     There are two seperate Data path managed here                                                 ////
+////     with seperate command and response memory                                                     ////
+////     Master-0 : This is targetted for CORE IMEM request                                            ////
+////                and expect only Read access                                                        ////
+////     Master-1: This is targetted to CORE DMEM or                                                   ////
+////               Indirect Memory access, Both Write and Read                                         ////
+////               accesss are supported.                                                              ////
+////               Upto 255 Byte Read/Write Burst supported                                            ////
+////    Limitation:                                                                                    ////
+////       1.  Write/Read FIFO Abort case not managed M1 port,                                         ////
+////           expect user to clearly close the busrt request                                          ////
+////       2.  Wishbone Request abort not yet supported.                                               ////
+////       3.  Write access through M0 Port not supported                                              ////
+////       4.  When Pre fetch feature used and both port m0 and                                        ////
+////           m1 used, user need to make sure that data pre fetch                                     ////
+////           count is withing 8DW, less Read path can hang due                                       ////
+////           to response FIFO full from one master port                                              ////
+////                                                                                                   ////
+////      Assumed Default Direct Address CS Mapping                                                    ////
+////      0x0000_0000 to 0x03FF_FFFF - CS-0 (64MB)                                                     ////
+////      0x0400_0000 to 0x07FF_FFFF - CS-1 (64MB)                                                     ////
+////      0x0800_0000 to 0x0BFF_FFFF - CS-2 (64MB)                                                     ////
+////      0x0C00_0000 to 0x0FFF_FFFF - CS-3 (64MB)                                                     ////
+////  To Do:                                                                                           ////
+////    1. Add support for WishBone request timout                                                     ////
+////    2. Add Pre-fetch feature for M0 Port                                                           ////
+////                                                                                                   ////
+////  Author(s):                                                                                       ////
+////      - Dinesh Annayya, dinesh.annayya@gmail.com                                                   ////
+////                                                                                                   ////
+////  Revision :                                                                                       ////
+////     0.0  -  June 8, 2021                                                                          //// 
+////     0.1  - June 25, 2021                                                                          ////
+////            Pad logic is brought inside the block to avoid                                         ////
+////            logic at digital core level for caravel project                                        ////
+////     0.2  - July 6, 2021                                                                           ////
+////            Added Hold fix cell for SPI data out signal to                                         ////
+////            met interface hold                                                                     ////
+////     0.3  - July 13, 2021                                                                          ////
+////            Data Prefetch feature added in M0 port, If Only                                        ////
+////            M0 Read used, then Prefetch read can be 255 Byte,                                      ////
+////            But if the Both M0 and M1 read access enabled,                                         ////
+////            then user need to make sure that M0 Prefetch is                                        ////
+////            with in 8DW or 32 Byte, else there is chance                                           ////
+////            data path can hang due to response FIFO full due                                       ////
+////            to partial reading of data                                                             ////
+////     0.4  -  July 26, 2021                                                                         ////
+////             QDDR (0xED) supported is added                                                        ////
+////     0.5  -  Nov 6, 2021                                                                           ////
+////             Clock Skew Moves inside the block                                                     ////
+////     0.6  -  Jan 13, 2022                                                                          ////
+////             All CS# brougt out from block                                                         ////
+////     0.7  -  Jan 14, 2022                                                                          ////
+////             1. Changed Dummy to 2 to 4 bit                                                        ////
+////             2. CS Address Map and Mask Reg added for Direct                                       ////
+////                access mode                                                                        ////
+////             3. Seperated spi init and spi final mode config                                       ////
+////                cfg_m*_spi_imode & cfg_m*_spi_fmode                                                ////
+////                *_imode loaded at init place of CS Assertion                                       ////
+////                & *_fmode loaded on switching place                                                //// 
+////     1.0  - Jan 25, 2022, Dinesh A                                                                 ////
+////             Direct memory Burst Mode support is added                                             ////
+////     1.1  - Feb 7, 2022, Dinesh A                                                                  ////
+////             CS0/CS1 will have Config support for FLASH SPI                                        ////
+////             CS2/CS3 will have config support SRAM SPI                                             ////
+////     1.2  - Feb 19, 2022, Dinesh A                                                                 ////
+////        A. Bug fix in spi rise and fall pulse relation w.r.t                                       ////
+////           spi_clk. Note: Previous version work only with                                          ////
+////           spi clock config = 0x2                                                                  ////
+////        B. spi_oen generation fix for different spi mode                                           ////
+////        C. spi_csn de-assertion fix for different spi clk div                                      ////
+////     1.3  - Mar 01, 2022, Dinesh A                                                                 ////
+////            m1*res*fifo * m1*cmd*fifo status added into                                            ////
+////            global config Register                                                                 ////
+////     1.4  - Aug 29, 2022, Dinesh A                                                                 ////
+////         A. Strap based CS#0 and CS#2 reset value change                                           ////
+////            Added                                                                                  ////
+////         B. Initialization bypass added to take care of case                                       ////
+////            for when there is only local reboot                                                    ////    
+////     1.5 -  Sept 2, 2022, Dinesh A                                                                 ////
+////     A. Add previous power on strap from SRAM flash to take care of mode switching                 ////
+////        1. If the current & previous sram strap is Single, then bypass mode switching              ////
+////        2. If the current=Single and Previous: Quad, then switch mode by command 0xFF (RSTDQI)     ////
+////        3. If the current=Quad and Previous: Quad, then bypass mode switching                      ////
+////        4. If the current=Quad and Previous: Single, then switch mode by command 0x38 (ESQI)       ////
+////                                                                                                   ////
+////                                                                                                   ////
+///////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////                                                              ////
 //// Copyright (C) 2000 Authors and OPENCORES.ORG                 ////
 ////                                                              ////
@@ -159,6 +166,7 @@ module qspim_top
 
     input  logic   [1:0]                 strap_flash,
     input  logic                         strap_sram,
+    input  logic                         strap_pre_sram,
     input  logic                         cfg_init_bypass, // Bypass initialization
 
     input  logic   [3:0]                 cfg_cska_sp_co, // spi clock skew adjust
@@ -485,6 +493,7 @@ qspim_regs
 
          .cfg_init_bypass               (cfg_init_bypass              ),
          .strap_flash                   (strap_flash                  ),
+         .strap_pre_sram                (strap_pre_sram               ),
          .strap_sram                    (strap_sram                   ),
 
 	    .fast_sim_mode                  (1'b0                         ),

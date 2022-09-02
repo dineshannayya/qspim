@@ -36,7 +36,7 @@ rtl: clean
 	vvp tb_top.vvp
 
 gate: clean  
-	iverilog -g2012  -D GL -D SPEEDSIM  -DFUNCTIONAL -DSIM  -I ../synth/netlist/  -I ../model -I $(PDK_ROOT)/sky130A  tb_top.v  -o tb_top.vvp
+	iverilog -g2012  -D GL -D SPEEDSIM  -DFUNCTIONAL -DSIM  -I ../verilog/gl/  -I ../model -I $(PDK_ROOT)/sky130A  tb_top.v  -o tb_top.vvp
 	vvp tb_top.vvp
 
 help:

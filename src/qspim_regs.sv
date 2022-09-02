@@ -76,6 +76,7 @@ module qspim_regs #( parameter WB_WIDTH = 32, parameter CMD_FIFO_WD = 40) (
     input  logic                         cfg_init_bypass  ,
     input  logic   [1:0]                 strap_flash      ,
     input  logic                         strap_sram       ,
+    input  logic                         strap_pre_sram   , // Previous Power-on SRAM Strap State
 
 
     input logic                          fast_sim_mode    , // Set 1 for simulation
@@ -303,6 +304,7 @@ parameter P_FSM_CR     = 4'b1100;  // COMMAND -> READ
   parameter P_SRAM_WRITE = 8'h02;
   parameter P_SRAM_ESDI  = 8'h3B; // Enter SDI (Dual)mode
   parameter P_SRAM_ESQI  = 8'h38; // Enter SQI (Quad) mode
+  parameter P_SRAM_RSTDQI  = 8'hFF; // Reset SDI/SQI mode
 
 
   parameter P_BYTE_1   = 4'b0000;
@@ -412,7 +414,7 @@ end
   assign cfg_exit_cnt  = (fast_sim_mode) ? 100: 500;
 
   integer byte_index;
-  always_ff @(negedge rst_n or posedge mclk) begin
+  always_ff @(posedge mclk) begin
     if ( rst_n == 1'b0 ) begin
       cfg_m0_fsm_reset      <= 'h0;
       cfg_dpft_dis          <= 'h0;
@@ -622,16 +624,33 @@ end
               SPI_SRAM_STRAP_CHECK: // Check SRAM STRAP
               begin
                  //-----------------------------------------------------------------------
-                 // Check the SPI SRAM Mode, On Power up SRAM comes up in Single SPI Mode
+                 // Check the SPI SRAM Mode, If the Previous Strap State is Single
                  // If we need QUAD Mode, We need to issue ESQI command
                  //-----------------------------------------------------------------------
-                 if(strap_sram == 1'b1) begin // If SRAM STRAP is QUAD Mode
+                 if(strap_pre_sram == 1'b0 && strap_sram == 1'b1) begin // If SRAM STRAP is QUAD Mode
                     cfg_m1_cs_reg        <= P_CS2;
                     cfg_m1_spi_imode     <= P_SINGLE;
                     cfg_m1_spi_fmode     <= P_SINGLE;
                     cfg_m1_spi_seq[3:0]  <= P_FSM_C;
                     cfg_m1_spi_switch    <= P_MODE_SWITCH_IDLE;
                     cfg_m1_cmd_reg       <= P_SRAM_ESQI;
+                    cfg_m1_mode_reg      <= 'h0; 
+                    cfg_m1_addr_cnt[1:0] <= 'h0; 
+                    cfg_m1_dummy_cnt[3:0]<= 'h0; 
+                    cfg_m1_data_cnt[7:0] <= 'h0; 
+                    cfg_m1_addr          <= 'h0; 
+                    cfg_m1_wrdy          <= 1'b1;
+                    cfg_m1_wdata         <= 'h0; 
+                    cfg_m1_req           <= 'h1;
+                    spi_init_state       <=  SPI_SRAM_ESQI_WAIT;
+                 end else if(strap_pre_sram == 1'b1 && strap_sram == 1'b0) begin 
+                   // If PRE_STRAP=QUAD and STRAP=SINGLE, then we need RSTDQI command
+                    cfg_m1_cs_reg        <= P_CS2;
+                    cfg_m1_spi_imode     <= P_QUAD;
+                    cfg_m1_spi_fmode     <= P_QUAD;
+                    cfg_m1_spi_seq[3:0]  <= P_FSM_C;
+                    cfg_m1_spi_switch    <= P_MODE_SWITCH_IDLE;
+                    cfg_m1_cmd_reg       <= P_SRAM_RSTDQI;
                     cfg_m1_mode_reg      <= 'h0; 
                     cfg_m1_addr_cnt[1:0] <= 'h0; 
                     cfg_m1_dummy_cnt[3:0]<= 'h0; 

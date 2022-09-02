@@ -89,7 +89,7 @@
      `include "libs.ref/sky130_fd_sc_hd/verilog/primitives.v"
      `include "libs.ref/sky130_fd_sc_hd/verilog/sky130_fd_sc_hd.v"
      `include "libs.ref/sky130_fd_sc_hvl/verilog/primitives.v"
-     `include "qspim_top.gv"
+     `include "qspim_top.v"
  `else
      `define USE_POWER_PINS
      `define UNIT_DELAY #0.1
@@ -223,6 +223,7 @@ parameter P_FLASH_DDRQIOR = 8'hED;  // DDR Quad I/O Read
 
     reg  [1:0]  strap_flash;
     reg         strap_sram;
+    reg         strap_pre_sram;
 
         wire flash_clk;
         wire [3:0] spi_csb;
@@ -265,6 +266,7 @@ parameter P_FLASH_DDRQIOR = 8'hED;  // DDR Quad I/O Read
 
 	initial begin
         strap_flash = 2'b11;
+        strap_pre_sram  = 1'b0;
         strap_sram  = 1'b1;
 		test_fail = 0;
 		wb_rst_i = 1'b1;
@@ -278,14 +280,17 @@ parameter P_FLASH_DDRQIOR = 8'hED;  // DDR Quad I/O Read
 		$display("############################################################");
         #1000 wb_rst_i = 1;
         #1000 strap_flash = P_SINGLE;
+              strap_pre_sram  = S_SINGLE;
               strap_sram  = S_SINGLE;
 
         #1000 wb_rst_i = 0;
 	     repeat (200) @(posedge clock);
+         `ifndef GL
          if(u_top.cfg_m0_g0_rd_cmd_reg != P_FLASH_FREAD) begin
             $display("ERROR: Wrong Command Found Exp: %x Rxd:%x", P_FLASH_FREAD,u_top.cfg_m0_g0_rd_cmd_reg);
             test_fail = 1;
          end
+         `endif
 		    wb_user_core_read_check(32'h00000200,read_data,32'h00000093);
 		    wb_user_core_read_check(32'h00000204,read_data,32'h00000113);
 		    wb_user_core_read_check(32'h00000208,read_data,32'h00000193);
@@ -308,14 +313,17 @@ parameter P_FLASH_DDRQIOR = 8'hED;  // DDR Quad I/O Read
 		$display("############################################################");
         #1000 wb_rst_i = 1;
         #1000 strap_flash = P_DOUBLE;
+              strap_pre_sram  = S_SINGLE;
               strap_sram  = S_SINGLE;
 
         #1000 wb_rst_i = 0;
 	     repeat (200) @(posedge clock);
+         `ifndef GL
          if(u_top.cfg_m0_g0_rd_cmd_reg != P_FLASH_DOR) begin
             $display("ERROR: Wrong Command Found Exp: %x Rxd:%x", P_FLASH_DOR,u_top.cfg_m0_g0_rd_cmd_reg);
             test_fail = 1;
          end
+         `endif
 		    wb_user_core_read_check(32'h00000200,read_data,32'h00000093);
 		    wb_user_core_read_check(32'h00000204,read_data,32'h00000113);
 		    wb_user_core_read_check(32'h00000208,read_data,32'h00000193);
@@ -339,14 +347,17 @@ parameter P_FLASH_DDRQIOR = 8'hED;  // DDR Quad I/O Read
 	     repeat (200) @(posedge clock);
         #1000 wb_rst_i = 1;
         #1000 strap_flash = P_QUAD;
+              strap_pre_sram  = S_SINGLE;
               strap_sram  = S_SINGLE;
 
         #1000 wb_rst_i = 0;
 	     repeat (200) @(posedge clock);
+         `ifndef GL
          if(u_top.cfg_m0_g0_rd_cmd_reg != P_FLASH_QIOR) begin
             $display("ERROR: Wrong Command Found Exp: %x Rxd:%x", P_FLASH_QIOR,u_top.cfg_m0_g0_rd_cmd_reg);
             test_fail = 1;
          end
+         `endif
 		    wb_user_core_read_check(32'h00000200,read_data,32'h00000093);
 		    wb_user_core_read_check(32'h00000204,read_data,32'h00000113);
 		    wb_user_core_read_check(32'h00000208,read_data,32'h00000193);
@@ -370,14 +381,17 @@ parameter P_FLASH_DDRQIOR = 8'hED;  // DDR Quad I/O Read
 	     repeat (200) @(posedge clock);
         #1000 wb_rst_i = 1;
         #1000 strap_flash = P_QDDR;
+              strap_pre_sram  = S_SINGLE;
               strap_sram  = S_SINGLE;
 
         #1000 wb_rst_i = 0;
 	     repeat (200) @(posedge clock);
+         `ifndef GL
          if(u_top.cfg_m0_g0_rd_cmd_reg != P_FLASH_DDRQIOR) begin
             $display("ERROR: Wrong Command Found Exp: %x Rxd:%x", P_FLASH_DDRQIOR,u_top.cfg_m0_g0_rd_cmd_reg);
             test_fail = 1;
          end
+         `endif
 		    wb_user_core_read_check(32'h00000200,read_data,32'h00000093);
 		    wb_user_core_read_check(32'h00000204,read_data,32'h00000113);
 		    wb_user_core_read_check(32'h00000208,read_data,32'h00000193);
@@ -401,6 +415,7 @@ parameter P_FLASH_DDRQIOR = 8'hED;  // DDR Quad I/O Read
 	     repeat (200) @(posedge clock);
         #1000 wb_rst_i = 1;
         #1000 strap_flash = P_QDDR;
+              strap_pre_sram  = S_SINGLE;
               strap_sram  = S_SINGLE;
 
         #1000 wb_rst_i = 0;
@@ -421,8 +436,9 @@ parameter P_FLASH_DDRQIOR = 8'hED;  // DDR Quad I/O Read
 		$display("############################################################");
 	     repeat (200) @(posedge clock);
         #1000 wb_rst_i = 1;
-        #1000 strap_flash = P_QDDR;
-              strap_sram  = S_QUAD;
+        #1000 strap_flash     = P_QDDR;
+              strap_pre_sram  = S_SINGLE;
+              strap_sram      = S_QUAD;
 
         #1000 wb_rst_i = 0;
 	     repeat (200) @(posedge clock);
@@ -438,21 +454,46 @@ parameter P_FLASH_DDRQIOR = 8'hED;  // DDR Quad I/O Read
 		wb_user_core_bread_check(32'h08003000,10'h8);
 
         $display("############################################################");
+		$display("  SRAM System Strap Testing....Step-3: strap_sram:S_SINGLE ");
+		$display("############################################################");
+	     repeat (200) @(posedge clock);
+        #1000 wb_rst_i = 1;
+        #1000 strap_flash     = P_QDDR;
+              strap_pre_sram  = S_QUAD;
+              strap_sram      = S_SINGLE;
+
+        #1000 wb_rst_i = 0;
+	     repeat (200) @(posedge clock);
+		data_array[10'h0]    = 32'h00112233;
+		data_array[10'h1]    = 32'h44556677;
+		data_array[10'h2]    = 32'h8899AABB;
+		data_array[10'h3]    = 32'hCCDDEEFF;
+		data_array[10'h4]    = 32'h00001111;
+		data_array[10'h5]    = 32'h22223333;
+		data_array[10'h6]    = 32'h44445555;
+		data_array[10'h7]    = 32'h66667777;
+		wb_user_core_bwrite(32'h08004000,10'h8);
+		wb_user_core_bread_check(32'h08004000,10'h8);
+
+        $display("############################################################");
 		$display("  End of Strap Testing                                     ");
 		$display("############################################################");
+
+
        //------------------ End of Strap Testing ------------------------------------------
 
 	     repeat (200) @(posedge clock);
         #1000 wb_rst_i = 1;
         #1000 strap_flash = P_QDDR;
+              strap_pre_sram  = S_SINGLE;
               strap_sram  = S_SINGLE;
 
         #1000 wb_rst_i = 0;
 
 		// CS#2 Switch From QSPI to SSPI Mode
-		wb_user_core_write(`QSPIM_IMEM_CTRL1,{16'h0,1'b0,1'b0,4'b0000,P_MODE_SWITCH_IDLE,P_QUAD,P_QUAD,4'b0100});
-		wb_user_core_write(`QSPIM_IMEM_CTRL2,{8'h0,2'b00,2'b00,P_FSM_C,8'h00,8'hFF});
-		wb_user_core_write(`QSPIM_IMEM_WDATA,32'h0);
+		//wb_user_core_write(`QSPIM_IMEM_CTRL1,{16'h0,1'b0,1'b0,4'b0000,P_MODE_SWITCH_IDLE,P_QUAD,P_QUAD,4'b0100});
+		//wb_user_core_write(`QSPIM_IMEM_CTRL2,{8'h0,2'b00,2'b00,P_FSM_C,8'h00,8'hFF});
+		//wb_user_core_write(`QSPIM_IMEM_WDATA,32'h0);
 
         $display("############################################################");
 		$display("  CS#2 SRAM INDIRECT READ ACCESS in SSPI Mode              ");
@@ -1567,7 +1608,6 @@ parameter P_FLASH_DDRQIOR = 8'hED;  // DDR Quad I/O Read
 		    wb_user_core_bwrite(32'h08000000,10'h8);
 		    wb_user_core_bread_check(32'h08000000,10'h8);
 		 end
-
 	        /**
 		//-----------------------------------------------------------------
 		//  FRAM TESTING SEQUENCE START HERE
@@ -1767,6 +1807,7 @@ qspim_top u_top(
 
     .cfg_init_bypass (1'b0),
     .strap_flash (strap_flash),
+    .strap_pre_sram  (strap_pre_sram),
     .strap_sram  (strap_sram),
 
     .cfg_cska_sp_co  ('h0), // spi clock skew adjust
