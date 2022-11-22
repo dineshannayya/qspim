@@ -452,6 +452,7 @@ parameter P_FSM_CR     = 4'b1100;  // COMMAND -> READ
 
       // WAIT for COMMAND Phase Completed
       FSM_CMD_PHASE: begin
+        spi_status[1] = 1'b1;
               counter_tx       = 8'h8;
               ctrl_data_mux    = DATA_CMD;
               ctrl_data_valid  = 1'b1;
@@ -547,6 +548,7 @@ parameter P_FSM_CR     = 4'b1100;  // COMMAND -> READ
 
       // Wait for WRITE COMMAND ACCEPTED
       FSM_WRITE_CMD: begin
+          spi_status[2] = 1'b1;
           nxt_cnt          = 0;
           ctrl_data_mux    = DATA_FIFO;
           ctrl_data_valid  = 1'b1;
@@ -561,6 +563,7 @@ parameter P_FSM_CR     = 4'b1100;  // COMMAND -> READ
 
       // Wait for ALL WRITE DATA ACCEPTED
       FSM_WRITE_PHASE: begin
+          spi_status[3] = 1'b1;
           nxt_cnt          = 0;
           ctrl_data_mux    = DATA_FIFO;
           ctrl_data_valid  = 1'b1;
@@ -576,6 +579,7 @@ parameter P_FSM_CR     = 4'b1100;  // COMMAND -> READ
 
       // Wait for Previous TX Completeion
       FSM_READ_WAIT: begin
+          spi_status[4] = 1'b1;
           spi_en_tx        = 1'b1;
 	  if (tx_done) begin
 	      next_state = FSM_READ_PHASE;
@@ -583,6 +587,7 @@ parameter P_FSM_CR     = 4'b1100;  // COMMAND -> READ
       end
 
       FSM_READ_PHASE: begin
+          spi_status[5] = 1'b1;
           nxt_cnt          = 0;
           counter_rx_valid = 1'b1;
           counter_rx       = {1'b0,cfg_data_cnt[11:0],3'b000}; // Convert Byte to Bit Count
@@ -598,6 +603,7 @@ parameter P_FSM_CR     = 4'b1100;  // COMMAND -> READ
         end
 
       FSM_FLUSH: begin
+       spi_status[6] = 1'b1;
 	   fsm_flush = 1;
 	   // Wait for safe SPI-clock de-assertion phase
 	   if(spi_clock_en ==0) begin 
@@ -606,12 +612,14 @@ parameter P_FSM_CR     = 4'b1100;  // COMMAND -> READ
       end
       // Wait for TX Done
       FSM_TX_DONE: begin
+       spi_status[7] = 1'b1;
          spi_en_tx        = 1'b1;
 	 if(tx_done) next_state  = FSM_CS_DEASEERT;
       end
 
       // De-assert CS#
       FSM_CS_DEASEERT: begin
+      spi_status[8] = 1'b1;
 	 if(cfg_cs_late == cnt) begin
 	     next_state  = FSM_IDLE;
 	 end else begin
