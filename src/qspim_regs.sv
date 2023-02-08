@@ -40,6 +40,10 @@
 ////                                                              ////
 ////  Revision :                                                  ////
 ////     V.0  -  June 8, 2021                                     //// 
+////     V.1  -  Jan 29, 2023                                     ////
+////             As part of MPW-2 Silicon Bring-up noticed        ////
+////             SPI Flash Power Up command (0xAB) need 3 us      ////
+////             delay before the next command                    ////
 ////                                                              ////
 //////////////////////////////////////////////////////////////////////
 ////                                                              ////
@@ -79,7 +83,7 @@ module qspim_regs #( parameter WB_WIDTH = 32, parameter CMD_FIFO_WD = 40) (
     input  logic                         strap_pre_sram   , // Previous Power-on SRAM Strap State
 
 
-    input logic                          fast_sim_mode    , // Set 1 for simulation
+    input logic                          cfg_fast_sim    , // Set 1 for simulation
 
     output logic                   [7:0] spi_clk_div      ,
     output logic                         spi_init_done    , // SPI internal Init completed
@@ -215,14 +219,15 @@ parameter SPI_STATUS         = 4'b1100;
 // Init FSM
 parameter SPI_INIT_PWUP         = 4'b0000;
 parameter SPI_INIT_IDLE         = 4'b0001;
-parameter SPI_INIT_CMD_WAIT     = 4'b0010;
-parameter SPI_INIT_WREN_CMD     = 4'b0011;
-parameter SPI_INIT_WREN_WAIT    = 4'b0100;
-parameter SPI_INIT_WRR_CMD      = 4'b0101;
-parameter SPI_INIT_WRR_WAIT     = 4'b0110;
-parameter SPI_SRAM_STRAP_CHECK  = 4'b0111;
-parameter SPI_SRAM_ESQI_WAIT    = 4'b1000;
-parameter SPI_INIT_WAIT         = 4'b1001;
+parameter SPI_POWERUP_CMD_WAIT  = 4'b0010;
+parameter SPI_POWERUP_CMD_DELAY = 4'b0011;
+parameter SPI_INIT_WREN_CMD     = 4'b0100;
+parameter SPI_INIT_WREN_WAIT    = 4'b0101;
+parameter SPI_INIT_WRR_CMD      = 4'b0110;
+parameter SPI_INIT_WRR_WAIT     = 4'b0111;
+parameter SPI_SRAM_STRAP_CHECK  = 4'b1000;
+parameter SPI_SRAM_ESQI_WAIT    = 4'b1001;
+parameter SPI_INIT_WAIT         = 4'b1010;
 
 /*************************************************************
 *  SPI FSM State Control
@@ -404,14 +409,16 @@ end
   // 3. WRITE CONFIG Reg - WRR (0x01) - Set Qaud Mode
   // --------------------------------------------
   
+  logic  [15:0]          cfg_pup_cnt  ;
   logic  [15:0]          cfg_entry_cnt  ;
   logic  [15:0]          cfg_exit_cnt  ;
   //--------------------------------------------
   // With Assuming 100Mhz clock, Entry wait 50us 
   // and exit wait for 5us assumed
   //--------------------------------------------
-  assign cfg_entry_cnt = (fast_sim_mode) ? 100: 5000;
-  assign cfg_exit_cnt  = (fast_sim_mode) ? 100: 500;
+  assign cfg_pup_cnt   = (cfg_fast_sim) ? 50: 300;
+  assign cfg_entry_cnt = (cfg_fast_sim) ? 50: 5000;
+  assign cfg_exit_cnt  = (cfg_fast_sim) ? 50: 500;
 
   integer byte_index;
   always_ff @(posedge mclk) begin
@@ -544,7 +551,7 @@ end
                  cfg_m1_spi_fmode     <= P_SINGLE;
                  cfg_m1_spi_seq[3:0]  <= P_FSM_C;
                  cfg_m1_spi_switch    <= '0;
-                 cfg_m1_cmd_reg       <= P_FLASH_RES;
+                 cfg_m1_cmd_reg       <= P_FLASH_RES; // POWER UP CMD
                  cfg_m1_mode_reg      <= 'h0; // Not Used
                  cfg_m1_addr_cnt[1:0] <= 'h0; // Not Used
                  cfg_m1_dummy_cnt[3:0]<= 'h0; // Not Used
@@ -552,15 +559,26 @@ end
                  cfg_m1_addr          <= 'h0; // Not Used
                  cfg_m1_wdata         <= 'h0; // Not Used
                  cfg_m1_req           <= 'h1;
-                 spi_init_state       <=  SPI_INIT_CMD_WAIT;
+                 spi_init_state       <=  SPI_POWERUP_CMD_WAIT;
               end
-              SPI_INIT_CMD_WAIT:
+              SPI_POWERUP_CMD_WAIT:
               begin
                  if(spim_m1_ack)   begin
                     cfg_m1_req       <= 1'b0;
-                    spi_init_state   <=  SPI_INIT_WREN_CMD;
+                    spi_delay_cnt    <= 'h0;
+                    spi_init_state   <=  SPI_POWERUP_CMD_DELAY;
                  end
               end
+              // After POWER-UP CMD, there is need for 3us delay for next cmd
+              SPI_POWERUP_CMD_DELAY: begin
+                   if(spi_delay_cnt == cfg_pup_cnt) begin
+                       spi_init_state   <=  SPI_INIT_WREN_CMD;
+           	       end else begin
+           	           spi_delay_cnt <= spi_delay_cnt+1;
+           	       end
+                end
+
+
               SPI_INIT_WREN_CMD:
               begin
                  cfg_m1_cs_reg        <= P_CS0;

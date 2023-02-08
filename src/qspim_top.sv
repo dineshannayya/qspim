@@ -110,6 +110,10 @@
 ////        2. If the current=Single and Previous: Quad, then switch mode by command 0xFF (RSTDQI)     ////
 ////        3. If the current=Quad and Previous: Quad, then bypass mode switching                      ////
 ////        4. If the current=Quad and Previous: Single, then switch mode by command 0x38 (ESQI)       ////
+////     1.6 -  Jan 29, 2023, Dinesh A                                                                 ////
+////          A. As part of MPW-2 Silicon Bug-Fx:-                                                     ////
+////             SPI Flash Power Up command (0xAB) need 3 us delay before the next command             ////
+////          B. FAST SIM connected to PORT for better GateSim control                                 ////
 ////                                                                                                   ////
 ////                                                                                                   ////
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -163,6 +167,7 @@ module qspim_top
 `endif
     input  logic                          mclk,
     input  logic                          rst_n,
+    input  logic                          cfg_fast_sim, // 0 -> Normal, 1 -> Fast Sim
 
     input  logic   [1:0]                 strap_flash,
     input  logic                         strap_sram,
@@ -496,7 +501,7 @@ qspim_regs
          .strap_pre_sram                (strap_pre_sram               ),
          .strap_sram                    (strap_sram                   ),
 
-	    .fast_sim_mode                  (1'b0                         ),
+	    .cfg_fast_sim                   (cfg_fast_sim                 ),
 
         .spi_clk_div                    (spi_clk_div                  ),
 	    .spi_init_done                  (spi_init_done                ),
