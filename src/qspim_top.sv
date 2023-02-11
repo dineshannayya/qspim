@@ -114,6 +114,8 @@
 ////          A. As part of MPW-2 Silicon Bug-Fx:-                                                     ////
 ////             SPI Flash Power Up command (0xAB) need 3 us delay before the next command             ////
 ////          B. FAST SIM connected to PORT for better GateSim control                                 ////
+////     1.7 -  Feb 10, 2023, Dinesh A                                                                 ////
+////            idle signal generated to support source clock gating
 ////                                                                                                   ////
 ////                                                                                                   ////
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -173,6 +175,7 @@ module qspim_top
     input  logic                         strap_sram,
     input  logic                         strap_pre_sram,
     input  logic                         cfg_init_bypass, // Bypass initialization
+    output logic                         qspim_idle,
 
     input  logic   [3:0]                 cfg_cska_sp_co, // spi clock skew adjust
     input  logic   [3:0]                 cfg_cska_spi,
@@ -694,7 +697,29 @@ qspim_ctrl #(.CMD_FIFO_WD(CMD_FIFO_WD)) u_spictrl
         .spi_sdi1                       (spi_sdi[1]                   ),
         .spi_sdi2                       (spi_sdi[2]                   ),
         .spi_sdi3                       (spi_sdi[3]                   ),
-	.spi_en_tx_out                  (spi_en_tx                    )
+	    .spi_en_tx_out                  (spi_en_tx                    )
     );
+
+
+//-------------------------------------------------------
+// QSPIM Idle generation based on no internal activity
+//-------------------------------------------------------
+
+
+always@ (posedge mclk or negedge rst_ss_n)
+begin
+   if(rst_ss_n == 1'b0) begin
+      qspim_idle <= 1'b0;
+   end else begin
+      qspim_idle <= spi_init_done & 
+                    m0_cmd_fifo_empty & m0_res_fifo_empty & 
+                    m1_cmd_fifo_empty & m1_cmd_fifo_empty &
+                    (ctrl_state == 0) & 
+                    (m0_state == 0) & 
+                    (m1_state == 0) ;
+
+   end
+end
+  
 
 endmodule
