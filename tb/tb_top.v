@@ -1804,6 +1804,7 @@ qspim_top u_top(
     `endif
     .mclk        (clock),  // System clock
     .rst_n       (!wb_rst_i),  // Regular Reset signal
+    .cfg_fast_sim (1'b1),
 
     .cfg_init_bypass (1'b0),
     .strap_flash (strap_flash),

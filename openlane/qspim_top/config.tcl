@@ -32,6 +32,7 @@ set ::env(CLOCK_PORT) "mclk"
 set ::env(SYNTH_MAX_FANOUT) 4
 
 ## CTS BUFFER
+set ::env(CTS_CLK_MAX_WIRE_LENGTH) {250}
 set ::env(CTS_CLK_BUFFER_LIST) "sky130_fd_sc_hd__clkbuf_4 sky130_fd_sc_hd__clkbuf_8"
 set ::env(CTS_SINK_CLUSTERING_SIZE) "16"
 set ::env(CLOCK_BUFFER_FANOUT) "8"
@@ -71,10 +72,13 @@ set ::env(GND_PIN) [list {vssd1}]
 set ::env(FP_PIN_ORDER_CFG) $::env(DESIGN_DIR)/pin_order.cfg
 
 set ::env(FP_SIZING) absolute
-set ::env(DIE_AREA) "0 0 450 550"
+set ::env(DIE_AREA) "0 0 450 500"
+
+#set ::env(GRT_OBS) "                              \
+#	                met4  0 0 450 550"
 
 set ::env(PL_TIME_DRIVEN) 1
-set ::env(PL_TARGET_DENSITY) "0.42"
+set ::env(PL_TARGET_DENSITY) "0.43"
 
 # If you're going to use multiple power domains, then keep this disabled.
 set ::env(RUN_CVC) 0
@@ -95,9 +99,26 @@ set ::env(FP_PDN_HWIDTH) 6.2
 
 #set ::env(GLB_RT_MAXLAYER) 5
 set ::env(RT_MAX_LAYER) {met4}
+
+#Lef 
+set ::env(MAGIC_GENERATE_LEF) {1}
+set ::env(MAGIC_WRITE_FULL_LEF) {0}
+
 #set ::env(GLB_RT_MAX_DIODE_INS_ITERS) 10
 set ::env(DIODE_INSERTION_STRATEGY) 4
 
+
+#LVS Issue - DEF Base looks to having issue
+set ::env(MAGIC_EXT_USE_GDS) {1}
+
+set ::env(GLB_RESIZER_MAX_SLEW_MARGIN) {1.5}
+set ::env(PL_RESIZER_MAX_SLEW_MARGIN) {1.5}
+
+set ::env(GLB_RESIZER_MAX_CAP_MARGIN) {0.25}
+set ::env(PL_RESIZER_MAX_CAP_MARGIN) {0.25}
+
+set ::env(GLB_RESIZER_MAX_WIRE_LENGTH) {500}
+set ::env(PL_RESIZER_MAX_WIRE_LENGTH) {500}
 
 set ::env(QUIT_ON_TIMING_VIOLATIONS) "0"
 set ::env(QUIT_ON_MAGIC_DRC) "1"

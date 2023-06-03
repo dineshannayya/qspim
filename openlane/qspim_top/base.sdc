@@ -39,9 +39,14 @@ set_case_analysis 0 [get_ports {cfg_cska_spi[2]}]
 set_case_analysis 0 [get_ports {cfg_cska_spi[3]}]
 
 
-set_max_delay   3.5 -from [get_ports {wbd_clk_int}]
-set_max_delay   2 -to   [get_ports {wbd_clk_spi}]
-set_max_delay 3.5 -from wbd_clk_int -to wbd_clk_spi
+#set_max_delay   3.5 -from [get_ports {wbd_clk_int}]
+#set_max_delay   2 -to   [get_ports {wbd_clk_spi}]
+#set_max_delay 3.5 -from wbd_clk_int -to wbd_clk_spi
+
+## Don't touch delay cells
+set_dont_touch { u_skew_spi.* }
+#set_dont_touch { u_skew_sp_co.* }
+#set_dont_touch { u_delay*.* }
 
 #Static Clock Skew control
 set_case_analysis 0 [get_ports {cfg_cska_sp_co[0]}]
@@ -283,6 +288,10 @@ set_driving_cell -lib_cell sky130_fd_sc_hd__inv_8 -pin $::env(SYNTH_DRIVING_CELL
 set cap_load [expr $::env(SYNTH_CAP_LOAD) / 1000.0]
 puts "\[INFO\]: Setting load to: $cap_load"
 set_load  $cap_load [all_outputs]
+
+set_max_transition 1.00 [current_design]
+set_max_capacitance 0.2 [current_design]
+set_max_fanout 10 [current_design]
 ###############################################################################
 # Design Rules
 ###############################################################################
