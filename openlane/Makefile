@@ -20,7 +20,7 @@ CLEAN = $(foreach block,$(BLOCKS), clean-$(block))
 
 OPENLANE_TAG = mpw9
 OPENLANE_IMAGE_NAME = riscduino/openlane:$(OPENLANE_TAG)
-OPENLANE_BASIC_COMMAND = "cd $(PWD)/../openlane && flow.tcl -design ./$* -save_path .. -save -tag $* -overwrite"
+OPENLANE_BASIC_COMMAND = "cd $(PWD)/../openlane && flow.tcl -design ./$*  -save_path .. -save -tag $* -overwrite"
 OPENLANE_INTERACTIVE_COMMAND = "cd $(PWD)/../openlane && flow.tcl -design ./$* -save_path .. -save -tag $* -overwrite -it -file ./$*/interactive.tcl"
 
 all: $(BLOCKS)

@@ -89,7 +89,7 @@
      `include "libs.ref/sky130_fd_sc_hd/verilog/primitives.v"
      `include "libs.ref/sky130_fd_sc_hd/verilog/sky130_fd_sc_hd.v"
      `include "libs.ref/sky130_fd_sc_hvl/verilog/primitives.v"
-     `include "qspim_top.v"
+     `include "qspim_top.nl.v"
  `else
      `define USE_POWER_PINS
      `define UNIT_DELAY #0.1

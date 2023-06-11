@@ -54,11 +54,16 @@ set ::env(VERILOG_FILES) "\
         $::env(DESIGN_DIR)/../../src/qspim_tx.sv \
 	    $::env(DESIGN_DIR)/../../lib/ctech_cells.sv     \
 	"
+set ::env(VERILOG_FILES_BLACKBOX) "\
+	    $::env(OPENLANE_ROOT)/plugin/yosys/Lighter/sky130_clkg_blackbox.v     \
+	"
 
 set ::env(SYNTH_DEFINES) [list SYNTHESIS ]
 set ::env(SYNTH_READ_BLACKBOX_LIB) 1
 set ::env(SDC_FILE) $::env(DESIGN_DIR)/base.sdc
 set ::env(BASE_SDC_FILE) $::env(DESIGN_DIR)/base.sdc
+
+set ::env(SYNTH_ENB_CG) 1
 
 set ::env(LEC_ENABLE) 0
 

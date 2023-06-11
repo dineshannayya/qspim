@@ -225,6 +225,55 @@ proc run_file {args} {
     set ::env(TCLLIBPATH) $::auto_path
     exec tclsh {*}$args >&@stdout
 }
+proc run_synthesis {args} {
+    increment_index
+    TIMER::timer_start
+    set log [index_file $::env(synthesis_logs)/synthesis.log]
+    puts_info "Running Synthesis (log: [relpath . $log])..."
+
+    set ::env(CURRENT_SDC) $::env(BASE_SDC_FILE)
+    # in-place insertion
+    if { [file exists $::env(synthesis_results)/$::env(DESIGN_NAME).v] } {
+        puts_warn "A netlist at $::env(synthesis_results)/$::env(DESIGN_NAME).v already exists. Synthesis will be skipped."
+        set_netlist $::env(synthesis_results)/$::env(DESIGN_NAME).v
+    } else {
+        run_yosys -indexed_log $log
+    }
+    TIMER::timer_stop
+    exec echo "[TIMER::get_runtime]" | python3 $::env(SCRIPTS_DIR)/write_runtime.py "synthesis - yosys"
+
+    if { $::env(QUIT_ON_ASSIGN_STATEMENTS) == 1 } {
+        check_assign_statements
+    }
+
+    if { $::env(QUIT_ON_UNMAPPED_CELLS) == 1 } {
+        set strategy_escaped [string map {" " _} $::env(SYNTH_STRATEGY)]
+        set final_stat_file $::env(synth_report_prefix).$strategy_escaped.stat.rpt
+        if { [info exists ::env(SYNTH_ELABORATE_ONLY)] \
+            && $::env(SYNTH_ELABORATE_ONLY) == 1 } {
+                set final_stat_file $::env(synth_report_prefix).stat
+            }
+        check_unmapped_cells $final_stat_file
+    }
+
+    run_sta\
+        -log $::env(synthesis_logs)/sta.log \
+        -netlist_in \
+        -pre_cts \
+        -save_to $::env(synthesis_results)
+
+    set ::env(LAST_TIMING_REPORT_TAG) [index_file $::env(synthesis_reports)/syn_sta]
+
+    if { [info exists ::env(SYNTH_USE_PG_PINS_DEFINES)] } {
+        puts_info "Creating a netlist with power/ground pins."
+        if { ! [info exists ::env(SYNTH_DEFINES)] } {
+            set ::env(SYNTH_DEFINES) [list]
+        }
+        lappend ::env(SYNTH_DEFINES) {*}$::env(SYNTH_USE_PG_PINS_DEFINES)
+        run_yosys -output $::env(synthesis_tmpfiles)/pg_define.v 
+    }
+
+}
 
 
 
@@ -256,10 +305,10 @@ proc run_flow {args} {
     set ANTENNACHECK_ENABLED [expr ![info exists flags_map(-no_antennacheck)] ]
 
     set steps [dict create \
-        "synthesis" "run_synthesis" 
-        #"floorplan" "run_floorplan" \
-        #"placement" "run_placement_step" \
-        #"cts" "run_cts_step" \
+        "synthesis" "run_synthesis" \
+        "floorplan" "run_floorplan" \
+        "placement" "run_placement_step" \
+        "cts" "run_cts_step" 
         #"routing" "run_routing_step" \
         #"parasitics_sta" "run_parasitics_sta_step" \
         #"eco" "run_eco_step" \

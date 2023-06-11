@@ -198,15 +198,15 @@ module qspim_rx #(
         clk_en_o     <= '0;
         data         <= 'b0;
         data_valid   <= 1'b0;
-	qddr_rx_en   <= 0;
+	    qddr_rx_en   <= 0;
         rx_CS        <= IDLE;
     end else begin
         // Enable qddr rx after first rx edge
         if(en && rx_edge && (rx_CS == RECEIVE) && (s_spi_mode ==P_QDDR)) begin
-	   qddr_rx_en <= 1;
+	       qddr_rx_en <= 1;
         end else if(!en || rx_done) begin
-	   qddr_rx_en <= 0;
-	end
+	       qddr_rx_en <= 0;
+	   end
 	
        data_valid <= data_valid_i;
        data <= (ENDIEAN) ? data_int_next : {data_int_next[7:0],data_int_next[15:8],data_int_next[23:16],data_int_next[31:24]};
