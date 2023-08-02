@@ -1608,6 +1608,38 @@ parameter P_FLASH_DDRQIOR = 8'hED;  // DDR Quad I/O Read
 		    wb_user_core_bwrite(32'h08000000,10'h8);
 		    wb_user_core_bread_check(32'h08000000,10'h8);
 		 end
+		$display("#############################################");
+		$display("  Testing SRAM Byte enable Write Access       ");
+		$display("#############################################");
+		    wb_user_core_write(`QSPIM_GLBL_CTRL,{16'h0, 8'h4,4'h4,2'b01,2'b01});
+		    wb_user_core_write(`QSPIM_DMEM_G1_WR_CTRL,{P_FSM_CAW, 4'b0000,2'b10,P_MODE_SWITCH_IDLE,P_SINGLE,P_SINGLE,8'h00,8'h02});
+		    wb_user_core_write(`QSPIM_DMEM_G1_RD_CTRL,{P_FSM_CADR,4'b0000,2'b10,P_MODE_SWITCH_IDLE,P_SINGLE,P_SINGLE,8'h00,8'h03});
+
+		    wb_user_core_be_write(32'h08000100,32'h01234567,4'hF);
+		    wb_user_core_be_write(32'h08000200,32'h00112233,4'h1);
+		    wb_user_core_be_write(32'h08000200,32'h00112233,4'h2);
+		    wb_user_core_be_write(32'h08000200,32'h00112233,4'h4);
+		    wb_user_core_be_write(32'h08000200,32'h00112233,4'h8);
+		    wb_user_core_be_write(32'h08000204,32'h44556677,4'h3);
+		    wb_user_core_be_write(32'h08000204,32'h44556677,4'hC);
+		    wb_user_core_be_write(32'h08000208,32'h8899AABB,4'h7);
+		    wb_user_core_be_write(32'h08000208,32'h8899AABB,4'h8);
+		    wb_user_core_be_write(32'h0800020C,32'hCCDDEEFF,4'h1);
+		    wb_user_core_be_write(32'h0800020C,32'hCCDDEEFF,4'hE);
+		    wb_user_core_be_write(32'h08000210,32'h01234567,4'h1);
+		    wb_user_core_be_write(32'h08000210,32'h01234567,4'h6);
+		    wb_user_core_be_write(32'h08000210,32'h01234567,4'h8);
+		    wb_user_core_be_write(32'h08000104,32'h89ABCDEF,4'hF);
+
+		    wb_user_core_read_check(32'h08000100,read_data,32'h01234567);
+		    wb_user_core_read_check(32'h08000200,read_data,32'h00112233);
+		    wb_user_core_read_check(32'h08000204,read_data,32'h44556677);
+		    wb_user_core_read_check(32'h08000208,read_data,32'h8899AABB);
+		    wb_user_core_read_check(32'h0800020C,read_data,32'hCCDDEEFF);
+		    wb_user_core_read_check(32'h08000210,read_data,32'h01234567);
+		    wb_user_core_read_check(32'h08000104,read_data,32'h89ABCDEF);
+
+
 	        /**
 		//-----------------------------------------------------------------
 		//  FRAM TESTING SEQUENCE START HERE
@@ -1933,6 +1965,61 @@ begin
   wbd_ext_dat_i ='h0;  // data output
   wbd_ext_sel_i ='h0;  // byte enable
   $display("STATUS: WB USER ACCESS WRITE Address : 0x%x, Data : 0x%x",address,data);
+  repeat (2) @(posedge clock);
+end
+endtask
+
+
+
+task MapData;
+input [31:0] DataIn;
+input [3:0]  Sel;
+output [31:0] DataOut;
+begin
+   case(Sel)
+   4'b0001 : DataOut = {24'hxxxxxx,DataIn[7:0]};
+   4'b0010 : DataOut = {16'hxxxx,DataIn[15:8],8'hxx};
+   4'b0100 : DataOut = {8'hxx,DataIn[23:16],16'hxxxx};
+   4'b1000 : DataOut = {DataIn[31:24],24'hxxxxxx};
+   4'b0011 : DataOut = {16'hxxxx,DataIn[15:0]};
+   4'b0110 : DataOut = {8'hxx,DataIn[23:8],8'hxx};
+   4'b1100 : DataOut = {DataIn[31:16],16'hxxxx};
+   4'b0111 : DataOut = {8'hxx,DataIn[23:0]};
+   4'b1110 : DataOut = {DataIn[31:8],8'hxx};
+   4'b1111 : DataOut = {DataIn[31:0]};
+   default : DataOut = 32'hxxxxxxxx;
+   endcase
+
+end
+endtask
+
+
+// Write with Byte enable
+task wb_user_core_be_write;
+input [31:0] address;
+input [31:0] data;
+input [3:0]  sel;
+begin
+  repeat (1) @(posedge clock);
+  #1;
+  wbd_ext_adr_i = address;  // address
+  wbd_ext_we_i  = 'h1;  // write
+  MapData(data,sel,wbd_ext_dat_i);  // data output
+  wbd_ext_sel_i = sel;  // byte enable
+  wbd_ext_bl_i  = 'h1;
+  wbd_ext_bry_i =  1'b1;
+  wbd_ext_cyc_i = 'h1;  // strobe/request
+  wbd_ext_stb_i = 'h1;  // strobe/request
+  wait(wbd_ext_ack_o == 1);
+  $display("STATUS: WB USER ACCESS WRITE Address : 0x%x, Data : 0x%x Byte Enable: 0x%x",wbd_ext_adr_i,wbd_ext_dat_i,wbd_ext_sel_i);
+  repeat (1) @(posedge clock);
+  #1;
+  wbd_ext_cyc_i ='h0;  // strobe/request
+  wbd_ext_stb_i ='h0;  // strobe/request
+  wbd_ext_adr_i ='h0;  // address
+  wbd_ext_we_i  ='h0;  // write
+  wbd_ext_dat_i ='h0;  // data output
+  wbd_ext_sel_i ='h0;  // byte enable
   repeat (2) @(posedge clock);
 end
 endtask

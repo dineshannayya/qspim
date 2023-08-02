@@ -208,7 +208,9 @@ logic [1:0]           cfg_m0_addr_cnt  ;  // SPI Addr Count
 logic [3:0]           cfg_m0_dummy_cnt ;  // SPI Dummy Count
 logic [7:0]           cfg_m0_cmd_reg   ;  // SPI MEM COMMAND
 logic [7:0]           cfg_m0_mode_reg  ;  // SPI MODE REG
-
+logic [11:0]          cfg_m0_data_cnt  ;
+logic [31:0]          cfg_m0_wdata     ;
+logic [31:0]          cfg_m0_addr     ;
   //---------------------------------------------------------------
   // Address Decoding
   // 0x0000_0000 - 0x0FFF_FFFF  - SPI FLASH MEMORY ACCESS - 256MB
@@ -322,7 +324,7 @@ always_comb begin
                         cfg_m0_mode_reg      = cfg_m0_g0_rd_mode_reg;
 		end
 		5'b00011,5'b00101: begin // CS0/CS1 Write Phase
-			cfg_m0_spi_imode     = cfg_m0_g0_wr_spi_imode;
+			            cfg_m0_spi_imode     = cfg_m0_g0_wr_spi_imode;
                         cfg_m0_spi_fmode     = cfg_m0_g0_wr_spi_fmode;
                         cfg_m0_spi_switch    = cfg_m0_g0_wr_spi_switch;
                         cfg_m0_spi_seq       = cfg_m0_g0_wr_spi_seq;
@@ -330,6 +332,7 @@ always_comb begin
                         cfg_m0_dummy_cnt     = cfg_m0_g0_wr_dummy_cnt;
                         cfg_m0_cmd_reg       = cfg_m0_g0_wr_cmd_reg;
                         cfg_m0_mode_reg      = cfg_m0_g0_wr_mode_reg;
+
 		end
 		5'b01000,5'b10000: begin // CS2/CS3 Read Phase
 			cfg_m0_spi_imode     = cfg_m0_g1_rd_spi_imode;
@@ -342,7 +345,7 @@ always_comb begin
                         cfg_m0_mode_reg      = cfg_m0_g1_rd_mode_reg;
 		end
 		5'b01001,5'b10001: begin // CS2/CS3 Write Phase
-			cfg_m0_spi_imode     = cfg_m0_g1_wr_spi_imode;
+			            cfg_m0_spi_imode     = cfg_m0_g1_wr_spi_imode;
                         cfg_m0_spi_fmode     = cfg_m0_g1_wr_spi_fmode;
                         cfg_m0_spi_switch    = cfg_m0_g1_wr_spi_switch;
                         cfg_m0_spi_seq       = cfg_m0_g1_wr_spi_seq;
@@ -358,6 +361,62 @@ always_comb begin
 
 end
 
+// To Support byte enabled based write access,
+always_comb begin
+   cfg_m0_data_cnt = {wbd_bl_i[9:0],2'b0};
+   if(wbd_we_i == 0) begin // Read case
+      cfg_m0_data_cnt = {wbd_bl_i[9:0],2'b0};
+   end else begin
+       case(wbd_sel_i)
+       4'b0001 : cfg_m0_data_cnt = 12'h1; 
+       4'b0010 : cfg_m0_data_cnt = 12'h1; 
+       4'b0100 : cfg_m0_data_cnt = 12'h1; 
+       4'b1000 : cfg_m0_data_cnt = 12'h1; 
+       4'b0011 : cfg_m0_data_cnt = 12'h2; 
+       4'b0110 : cfg_m0_data_cnt = 12'h2; 
+       4'b1100 : cfg_m0_data_cnt = 12'h2; 
+       4'b0111 : cfg_m0_data_cnt = 12'h3; 
+       4'b1110 : cfg_m0_data_cnt = 12'h3; 
+       default : cfg_m0_data_cnt = {wbd_bl_i[9:0],2'b0};
+       endcase
+    end
+end
+
+always_comb begin
+   cfg_m0_wdata = wbd_dat_i;
+   case(wbd_sel_i)
+   4'b0001 : cfg_m0_wdata  = {24'h0,wbd_dat_i[7:0]};
+   4'b0010 : cfg_m0_wdata  = {24'h0,wbd_dat_i[15:8]};
+   4'b0100 : cfg_m0_wdata  = {24'h0,wbd_dat_i[23:16]};
+   4'b1000 : cfg_m0_wdata  = {24'h0,wbd_dat_i[31:24]};
+   4'b0011 : cfg_m0_wdata  = {16'h0,wbd_dat_i[15:0]};
+   4'b0110 : cfg_m0_wdata  = {16'h0,wbd_dat_i[23:8]};
+   4'b1100 : cfg_m0_wdata  = {16'h0,wbd_dat_i[31:16]};
+   4'b0111 : cfg_m0_wdata  = {8'h0,wbd_dat_i[23:0]};
+   4'b1110 : cfg_m0_wdata  = {8'h0,wbd_dat_i[31:8]};
+   default : cfg_m0_wdata  = wbd_dat_i;
+   endcase
+end
+
+always_comb begin
+   cfg_m0_addr = {spim_wb_addr[31:2],2'b00};
+   if(wbd_we_i == 0) begin // Read case
+      cfg_m0_addr = {spim_wb_addr[31:2],2'b00};
+   end else begin
+      case(wbd_sel_i)
+      4'b0001 : cfg_m0_addr  = {spim_wb_addr[31:2],2'b00};
+      4'b0010 : cfg_m0_addr  = {spim_wb_addr[31:2],2'b01};
+      4'b0100 : cfg_m0_addr  = {spim_wb_addr[31:2],2'b10};
+      4'b1000 : cfg_m0_addr  = {spim_wb_addr[31:2],2'b11};
+      4'b0011 : cfg_m0_addr  = {spim_wb_addr[31:2],2'b00};
+      4'b0110 : cfg_m0_addr  = {spim_wb_addr[31:2],2'b01};
+      4'b1100 : cfg_m0_addr  = {spim_wb_addr[31:2],2'b10};
+      4'b0111 : cfg_m0_addr  = {spim_wb_addr[31:2],2'b00};
+      4'b1110 : cfg_m0_addr  = {spim_wb_addr[31:2],2'b01};
+      default : cfg_m0_addr  = {spim_wb_addr[31:2],2'b00};
+      endcase
+   end
+end
 
 
 always_ff @(negedge rst_n or posedge mclk) begin
@@ -386,11 +445,11 @@ begin
    case(state)
    IDLE:  begin
 	if(spim_mem_req && cmd_fifo_empty) begin
-	   cmd_fifo_wdata = {SOC,NOC,{wbd_bl_i[9:0],2'b0},
+	   cmd_fifo_wdata = {SOC,NOC,cfg_m0_data_cnt,
 		                  cfg_m0_dummy_cnt[3:0],cfg_m0_addr_cnt[1:0],
 		                  cfg_m0_spi_switch[1:0],cfg_m0_spi_fmode[1:0],
 		                  cfg_m0_spi_imode[1:0],
-				  cfg_m0_spi_seq[3:0],cfg_m0_cs_reg[3:0],
+				          cfg_m0_spi_seq[3:0],cfg_m0_cs_reg[3:0],
 		                  cfg_m0_mode_reg[7:0],cfg_m0_cmd_reg[7:0]};
 	   next_wbd_bl_cnt = wbd_bl_i;
 	   cmd_fifo_wr    = 1;
@@ -399,10 +458,10 @@ begin
    end
    ADR_PHASE: begin
 	  if(spim_wb_we) begin
-              cmd_fifo_wdata = {NOC,NOC,16'h0,spim_wb_addr[31:0]};
+             cmd_fifo_wdata = {NOC,NOC,16'h0,cfg_m0_addr};
              next_state = WRITE_DATA;
           end else begin
-              cmd_fifo_wdata = {NOC,EOC,16'h0,spim_wb_addr[31:0]};
+              cmd_fifo_wdata = {NOC,EOC,16'h0,cfg_m0_addr};
              next_state = CMD_WAIT;
           end
           cmd_fifo_wr      = 1;
@@ -416,17 +475,17 @@ begin
 
    READ_DATA: begin
 	if(res_fifo_empty != 1 && wbd_bry_i) begin
-           spi_mem_rdata    = res_fifo_rdata;
+       spi_mem_rdata    = res_fifo_rdata;
 	   next_wbd_bl_cnt  = wbd_bl_cnt-1;
 	   res_fifo_rd   = 1;
-           spim_mem_ack  = 1;
+       spim_mem_ack  = 1;
 	   if(next_wbd_bl_cnt == 0) 
                next_state    = IDLE;
 	end
    end
    WRITE_DATA: begin
        if(wbd_ack_o)begin 
-           cmd_fifo_wdata = {NOC,EOC,16'b0,wbd_dat_i[31:0]};
+           cmd_fifo_wdata = {NOC,EOC,16'b0,cfg_m0_wdata[31:0]};
            cmd_fifo_wr    = 1;
 	end
 	if(cmd_fifo_full != 1 && !(cmd_fifo_afull && wbd_ack_o) &&  wbd_bry_i) begin

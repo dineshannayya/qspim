@@ -120,6 +120,7 @@
 ////            A. Bug fix: SPI clock de-async de-assertion changed to spi-pos clock                   ////
 ////            B. Bug Fix: Made sure that CS de-assert start only after SPI clock in idle state       ////
 ////            C. added a 4 bit register to add delay between back-back command                       ////
+////            D. Bug Fix: Added Support for partital byte based write access                         ////
 ////                                                                                                   ////
 ////                                                                                                   ////
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////
