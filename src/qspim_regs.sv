@@ -144,6 +144,7 @@ module qspim_regs #( parameter WB_WIDTH = 32, parameter CMD_FIFO_WD = 40) (
 
     output logic [1:0]                   cfg_cs_early     ,  // Amount of cycle early CS asserted
     output logic [1:0]                   cfg_cs_late      ,  // Amount of cycle late CS de-asserted
+    output logic [3:0]                   cfg_cmd_delay    ,  // Delay between processing command
 
     // Towards Reg I/F
     input  logic                         spim_reg_req     ,   // Reg Request
@@ -506,6 +507,7 @@ end
 
       cfg_cs_early         <= 'h1;
       cfg_cs_late          <= 'h1;
+      cfg_cmd_delay        <= 'h4;
       spi_clk_div          <= 'h2;
 
       spi_init_done         <=  'h0;
@@ -707,6 +709,7 @@ end
              if ( spim_reg_be[0] == 1 ) begin
                 cfg_cs_early  <= spim_reg_wdata[1:0];
                 cfg_cs_late   <= spim_reg_wdata[3:2];
+                cfg_cmd_delay <= spim_reg_wdata[7:4];
              end
              if ( spim_reg_be[1] == 1 ) begin
                 spi_clk_div <= spim_reg_wdata[15:8];
@@ -873,7 +876,7 @@ end
           case(spim_reg_addr)
             GLBL_CTRL:         reg_rdata[31:0] = {cfg_m0_fsm_reset,cfg_dpft_dis,10'h0,
 		                                  {res_fifo_full,res_fifo_empty,cmd_fifo_full,cmd_fifo_empty},
-						  spi_clk_div,4'h0,cfg_cs_late,cfg_cs_early};
+						  spi_clk_div,cfg_cmd_delay,cfg_cs_late,cfg_cs_early};
 	    DMEM_CS0_RD_CTRL:  reg_rdata[31:0] = {cfg_m0_g0_rd_spi_seq   ,cfg_m0_g0_rd_dummy_cnt,cfg_m0_g0_rd_addr_cnt,
 		                                  cfg_m0_g0_rd_spi_switch,cfg_m0_g0_rd_spi_fmode,cfg_m0_g0_rd_spi_imode,
 						  cfg_m0_g0_rd_mode_reg  ,cfg_m0_g0_rd_cmd_reg};

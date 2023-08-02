@@ -70,12 +70,13 @@ module qspim_ctrl  #(
     input  logic                          rstn,
 
     input  logic                    [7:0] spi_clk_div,
-    output logic                    [8:0] spi_status,
+    output logic                    [9:0] spi_status,
 
     // Master 0 Configuration
 
     input  logic [1:0]                   cfg_cs_early     ,  // Amount of cycle early CS asserted
     input  logic [1:0]                   cfg_cs_late      ,  // Amount of cycle late CS de-asserted
+    input  logic [3:0]                   cfg_cmd_delay    ,  // Amount of cycle delay between command
 
     // Master 0 Command FIFO Interface
     input  logic                         m0_cmd_fifo_empty,
@@ -193,6 +194,7 @@ parameter P_FSM_CR     = 4'b1100;  // COMMAND -> READ
 // ---------------------------------------
   logic spi_rise;
   logic spi_fall;
+  logic spi_clk_idle; // Indicate SPI clock in idle phase
 
   logic spi_clock_en;
 
@@ -223,8 +225,8 @@ parameter P_FSM_CR     = 4'b1100;  // COMMAND -> READ
 
   logic        tx_clk_en;
   logic        rx_clk_en;
-  logic [1:0]  cnt; // counter for cs assertion and de-assertion
-  logic [1:0]  nxt_cnt;
+  logic [3:0]  cnt; // counter for cs assertion and de-assertion
+  logic [3:0]  nxt_cnt;
   logic [1:0]  gnt;
 
   logic  [11:0] cfg_data_cnt    ;
@@ -236,19 +238,22 @@ parameter P_FSM_CR     = 4'b1100;  // COMMAND -> READ
 
   enum logic [2:0] {DATA_NULL,DATA_EMPTY,DATA_CMD,DATA_ADDR,DATA_MODE,DATA_FIFO} ctrl_data_mux;
 
-  enum logic [4:0] {FSM_IDLE        = 5'h0,
-	            FSM_CS_ASSERT   = 5'h1,
-		    FSM_CMD_PHASE   = 5'h2,
-		    FSM_ADR_PHASE   = 5'h3,
-		    FSM_DUMMY_PHASE = 5'h4,
-		    FSM_MODE_PHASE  = 5'h5,
-		    FSM_WRITE_CMD   = 5'h6,
-		    FSM_WRITE_PHASE = 5'h7,
-	            FSM_READ_WAIT   = 5'h8,
-		    FSM_READ_PHASE  = 5'h9,
-		    FSM_TX_DONE     = 5'hA,
-		    FSM_FLUSH       = 5'hB,
-		    FSM_CS_DEASEERT = 5'hC} state,next_state;
+  enum logic [4:0] {
+            FSM_IDLE        = 5'h0,
+            FSM_CMD_WAIT    = 5'h1,
+	        FSM_CS_ASSERT   = 5'h2,
+		    FSM_CMD_PHASE   = 5'h3,
+		    FSM_ADR_PHASE   = 5'h4,
+		    FSM_DUMMY_PHASE = 5'h5,
+		    FSM_MODE_PHASE  = 5'h6,
+		    FSM_WRITE_CMD   = 5'h7,
+		    FSM_WRITE_PHASE = 5'h8,
+	        FSM_READ_WAIT   = 5'h9,
+		    FSM_READ_PHASE  = 5'hA,
+		    FSM_TX_DONE     = 5'hB,
+		    FSM_FLUSH       = 5'hC,
+		    FSM_CLK_IDLE    = 5'hD,
+		    FSM_CS_DEASEERT = 5'hE} state,next_state;
 
  
   assign ctrl_state =  state[3:0];
@@ -322,7 +327,8 @@ parameter P_FSM_CR     = 4'b1100;  // COMMAND -> READ
     .cfg_sck_period ( spi_clk_div [5:0]      ),
     .spi_clk        ( spi_clk                ),
     .spi_fall       ( spi_fall               ),
-    .spi_rise       ( spi_rise               )
+    .spi_rise       ( spi_rise               ),
+    .spi_clk_idle   ( spi_clk_idle           )
   );
   qspim_tx u_txreg
   (
@@ -434,20 +440,42 @@ parameter P_FSM_CR     = 4'b1100;  // COMMAND -> READ
       FSM_IDLE:
       begin
         spi_status[0] = 1'b1;
-	nxt_cnt    = 0;
-	if(!m0_cmd_fifo_empty || !m1_cmd_fifo_empty )  begin
-	   next_state  = FSM_CS_ASSERT;
+	    if(!m0_cmd_fifo_empty || !m1_cmd_fifo_empty )  begin
+	       if(cfg_cmd_delay == cnt) begin // If between cmd wait delay met
+               nxt_cnt     = 0;
+	           next_state  = FSM_CS_ASSERT;
+           end else begin // if between cmd wait delay not met
+               nxt_cnt = nxt_cnt+1;
+	           next_state  = FSM_CMD_WAIT;
+           end
+	    end else begin
+	       if(cfg_cmd_delay != cnt) begin
+              nxt_cnt = nxt_cnt+1;
+           end
+        end
+      end
+
+      // To avoid one cycle between two back to back command
+      // We added command wait
+      FSM_CMD_WAIT:
+      begin
+        spi_status[0] = 1'b1;
+	    if(cfg_cmd_delay == cnt) begin
+           nxt_cnt     = 0;
+	       next_state  = FSM_CS_ASSERT;
+	    end else begin
+           nxt_cnt = nxt_cnt+1;
         end
       end
 
       // Asserted CS# low
       FSM_CS_ASSERT: begin
-	 fsm_flush=1; // Flush stale data in response fifo
-	 if(cfg_cs_early == cnt) begin
-	     next_state  = FSM_CMD_PHASE;
-	 end else begin
-             nxt_cnt = nxt_cnt+1;
-	 end
+	    fsm_flush=1; // Flush stale data in response fifo
+	    if(cfg_cs_early == cnt) begin
+	       next_state  = FSM_CMD_PHASE;
+	    end else begin
+           nxt_cnt = nxt_cnt+1;
+	    end
       end
 
       // WAIT for COMMAND Phase Completed
@@ -520,11 +548,11 @@ parameter P_FSM_CR     = 4'b1100;  // COMMAND -> READ
               ctrl_data_valid = 1'b0;
 	      case(cfg_spi_seq)
               P_FSM_CADR:  next_state = FSM_READ_WAIT;
-	      P_FSM_CAMDR: next_state = FSM_READ_WAIT;
-	      P_FSM_CADW:  next_state = FSM_WRITE_CMD;
-	      P_FSM_CDR:   next_state = FSM_READ_WAIT;
-	      P_FSM_CDW:   next_state = FSM_WRITE_CMD;
-	      default  :   next_state = FSM_CS_DEASEERT;
+	          P_FSM_CAMDR: next_state = FSM_READ_WAIT;
+	          P_FSM_CADW:  next_state = FSM_WRITE_CMD;
+	          P_FSM_CDR:   next_state = FSM_READ_WAIT;
+	          P_FSM_CDW:   next_state = FSM_WRITE_CMD;
+	          default  :   next_state = FSM_CLK_IDLE;
               endcase
            end
         end
@@ -541,7 +569,7 @@ parameter P_FSM_CR     = 4'b1100;  // COMMAND -> READ
 	      P_FSM_CAMR:  next_state = FSM_READ_WAIT;
 	      P_FSM_CAMDR: next_state = FSM_DUMMY_PHASE;
 	      P_FSM_CAMW:  next_state = FSM_WRITE_CMD;
-	      default  :   next_state = FSM_CS_DEASEERT;
+	      default  :   next_state = FSM_CLK_IDLE;
               endcase
            end
         end
@@ -569,7 +597,7 @@ parameter P_FSM_CR     = 4'b1100;  // COMMAND -> READ
           ctrl_data_valid  = 1'b1;
           spi_en_tx        = 1'b1;
 	  if (tx_done) begin
-	      next_state = FSM_CS_DEASEERT;
+	      next_state = FSM_CLK_IDLE;
            end else if(tx_data_ready  && cmd_fifo_empty == 0) begin
 	      // Once Current Data is accepted by TX FSM, check FIFO not empty
 	      // and read next location
@@ -597,7 +625,7 @@ parameter P_FSM_CR     = 4'b1100;  // COMMAND -> READ
 	      next_state = FSM_FLUSH;
 	  end else begin
 	     if (rx_done && spi_rise) begin
-	         next_state = FSM_CS_DEASEERT;
+	         next_state = FSM_CLK_IDLE;
              end 
 	  end
         end
@@ -607,21 +635,29 @@ parameter P_FSM_CR     = 4'b1100;  // COMMAND -> READ
 	   fsm_flush = 1;
 	   // Wait for safe SPI-clock de-assertion phase
 	   if(spi_clock_en ==0) begin 
-	         next_state = FSM_CS_DEASEERT;
+	         next_state = FSM_CLK_IDLE;
 	   end
       end
       // Wait for TX Done
       FSM_TX_DONE: begin
        spi_status[7] = 1'b1;
-         spi_en_tx        = 1'b1;
-	 if(tx_done) next_state  = FSM_CS_DEASEERT;
+       spi_en_tx        = 1'b1;
+	     if(tx_done) next_state  = FSM_CLK_IDLE;
+      end
+
+      // WAIT for SPI CLOCK entering into IDLE Phase
+      FSM_CLK_IDLE: begin
+       spi_status[8] = 1'b1;
+       nxt_cnt          = 0;
+	     if(spi_clk_idle) next_state  = FSM_CS_DEASEERT;
       end
 
       // De-assert CS#
       FSM_CS_DEASEERT: begin
-      spi_status[8] = 1'b1;
+      spi_status[9] = 1'b1;
 	 if(cfg_cs_late == cnt) begin
 	     next_state  = FSM_IDLE;
+	     nxt_cnt     = 0;
 	 end else begin
              nxt_cnt = nxt_cnt+1;
 	 end
@@ -725,7 +761,7 @@ end
         spi_csn2 <= 1'b1;
         spi_csn3 <= 1'b1;
      end else begin
-	if(state != FSM_IDLE) begin
+	if(state != FSM_IDLE && state != FSM_CMD_WAIT) begin
            spi_csn0 <= ~cfg_cs_reg[0];
            spi_csn1 <= ~cfg_cs_reg[1];
            spi_csn2 <= ~cfg_cs_reg[2];

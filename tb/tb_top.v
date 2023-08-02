@@ -1592,7 +1592,7 @@ parameter P_FLASH_DDRQIOR = 8'hED;  // DDR Quad I/O Read
 		$display("#############################################");
 		for(cnt = 4; cnt < 16; cnt = cnt+2) begin
 		    $display("SPI Testing with Clock Div value: %x ",cnt);
-		    wb_user_core_write(`QSPIM_GLBL_CTRL,{16'h0, cnt[7:0],4'b0,2'b01,2'b01});
+		    wb_user_core_write(`QSPIM_GLBL_CTRL,{16'h0, cnt[7:0],4'h4,2'b01,2'b01});
 
 		    wb_user_core_write(`QSPIM_DMEM_G1_WR_CTRL,{P_FSM_CAW, 4'b0000,2'b10,P_MODE_SWITCH_IDLE,P_SINGLE,P_SINGLE,8'h00,8'h02});
 		    wb_user_core_write(`QSPIM_DMEM_G1_RD_CTRL,{P_FSM_CADR,4'b0000,2'b10,P_MODE_SWITCH_IDLE,P_SINGLE,P_SINGLE,8'h00,8'h03});

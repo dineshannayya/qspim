@@ -43,6 +43,12 @@
 ////      0.2 - 24th Mar 2021, Dinesh A                           ////
 ////            1. Comments are added                             ////
 ////            2. RTL clean-up done and the output are registred ////
+////      0.3 - 1 Aug 2023, Dinesh A                              ////
+////            As part of 2206Q bug fix:                         ////
+////            spi-clk de-assertion at end of transaction was not////
+////            aligned to spi clock config. Not we are de-assert ////
+////            spi_rise edge, previously it abortly de-asserting ////
+////            at system clock.
 ////                                                              ////
 //////////////////////////////////////////////////////////////////////
 ////                                                              ////
@@ -79,7 +85,8 @@ module qspim_clkgen
     input  logic          [5:0]         cfg_sck_period,
     output logic                        spi_clk,
     output logic                        spi_fall,
-    output logic                        spi_rise
+    output logic                        spi_rise,
+    output logic                        spi_clk_idle  // Indicate SPI clock in idle phase
 );
 
 	logic [5:0] sck_half_period;
@@ -91,7 +98,8 @@ module qspim_clkgen
     // after en is asserted
     always @(posedge clk or negedge rstn) begin
     	if(!rstn) begin
-    	   spi_clk    <= 1'b1;
+    	   spi_clk      <= 1'b1;
+           spi_clk_idle <= 1'b1;
     	end // if (!reset_n)
     	else 
     	begin
@@ -99,13 +107,18 @@ module qspim_clkgen
     	   begin
     	      if(spi_fall) 
     	      begin
-    		 spi_clk    <= 1'b0;
+    		    spi_clk      <= 1'b0;
+                spi_clk_idle <= 1'b0;
     	      end // if (clk_cnt == sck_half_period)
     	      else if(spi_rise) begin
-    		    spi_clk    <= 1'b1;
+    		    spi_clk      <= 1'b1;
+                spi_clk_idle <= 1'b0;
     	      end 
     	   end else begin
-    	      spi_clk    <= 1'b1;
+    	      if(spi_rise) begin
+                 spi_clk      <= 1'b1;
+                 spi_clk_idle <= 1'b1;
+              end
     	   end // else: !if(en)
     	end // else: !if(!reset_n)
     end // always @ (posedge clk or negedge reset_n)
@@ -115,29 +128,29 @@ module qspim_clkgen
     always @(posedge clk or negedge rstn) begin
     	if(!rstn) begin
     	   clk_cnt    <= 'h1;
-	   spi_fall   <= 1'b0;
-	   spi_rise   <= 1'b0;
+	       spi_fall   <= 1'b0;
+	       spi_rise   <= 1'b0;
     	end // if (!reset_n)
     	else 
     	begin
     	   if(clk_cnt == sck_half_period) 
     	   begin
-	      spi_fall   <= 1'b0;
-	      spi_rise   <= 1'b1;
+	          spi_fall   <= 1'b0;
+	          spi_rise   <= 1'b1;
     	      clk_cnt    <= clk_cnt + 1'b1;
     	   end // if (clk_cnt == sck_half_period)
     	   else begin
     	      if(clk_cnt == cfg_sck_period) 
     	      begin
-	         spi_fall   <= 1'b1;
-	         spi_rise   <= 1'b0;
+	             spi_fall   <= 1'b1;
+	             spi_rise   <= 1'b0;
     	         clk_cnt    <= 'h1;
     	      end // if (clk_cnt == cfg_sck_period)
     	      else 
     	      begin
     	         clk_cnt    <= clk_cnt + 1'b1;
-	         spi_fall   <= 1'b0;
-	         spi_rise   <= 1'b0;
+	             spi_fall   <= 1'b0;
+	             spi_rise   <= 1'b0;
     	       end // else: !if(clk_cnt == cfg_sck_period)
     	   end // else: !if(clk_cnt == sck_half_period)
     	end // else: !if(!reset_n)

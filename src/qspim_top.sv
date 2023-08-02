@@ -115,7 +115,11 @@
 ////             SPI Flash Power Up command (0xAB) need 3 us delay before the next command             ////
 ////          B. FAST SIM connected to PORT for better GateSim control                                 ////
 ////     1.7 -  Feb 10, 2023, Dinesh A                                                                 ////
-////            idle signal generated to support source clock gating
+////            idle signal generated to support source clock gating                                   ////
+////     1.8 -  Aug 2, 2023, Dinesh A                                                                  ////
+////            A. Bug fix: SPI clock de-async de-assertion changed to spi-pos clock                   ////
+////            B. Bug Fix: Made sure that CS de-assert start only after SPI clock in idle state       ////
+////            C. added a 4 bit register to add delay between back-back command                       ////
 ////                                                                                                   ////
 ////                                                                                                   ////
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -261,8 +265,9 @@ module qspim_top
     logic [7:0]                   cfg_m0_g1_wr_cmd_reg   ;  // SPI MEM COMMAND
     logic [7:0]                   cfg_m0_g1_wr_mode_reg  ;  // SPI MODE REG
 
-    logic [1:0]                   cfg_cs_early     ;  // Amount of cycle early CS asserted
-    logic [1:0]                   cfg_cs_late      ;  // Amount of cycle late CS de-asserted
+    logic [1:0]                   cfg_cs_early           ;  // Amount of cycle early CS asserted
+    logic [1:0]                   cfg_cs_late            ;  // Amount of cycle late CS de-asserted
+    logic [3:0]                   cfg_cmd_delay          ;  // Amount of cycle late CS de-asserted
 
     // Towards Reg I/F
     logic                         spim_reg_req     ;   // Reg Request
@@ -312,7 +317,7 @@ module qspim_top
 //-----------------------------------------------------
 // SPI Debug monitoring
 // ----------------------------------------------------
-    logic [8:0]   spi_ctrl_status       ;
+    logic [9:0]   spi_ctrl_status       ;
     logic [3:0]   m0_state         ;
     logic [3:0]   m1_state         ;
     logic [3:0]   ctrl_state        ;
@@ -561,8 +566,9 @@ qspim_regs
         .cfg_m0_g1_wr_cmd_reg          (cfg_m0_g1_wr_cmd_reg        ), // SPI MEM COMMAND
         .cfg_m0_g1_wr_mode_reg         (cfg_m0_g1_wr_mode_reg       ), // SPI MODE REG
 
-	.cfg_cs_early                   (cfg_cs_early                 ),
-	.cfg_cs_late                    (cfg_cs_late                  ),
+	    .cfg_cs_early                   (cfg_cs_early               ),
+	    .cfg_cs_late                    (cfg_cs_late                ),
+	    .cfg_cmd_delay                  (cfg_cmd_delay              ),
 
     // Towards Reg I/F
         .spim_reg_req                   (spim_reg_req                 ), // Reg Request
@@ -658,8 +664,9 @@ qspim_ctrl #(.CMD_FIFO_WD(CMD_FIFO_WD)) u_spictrl
         .spi_status                     (spi_ctrl_status              ),
 
 
-	.cfg_cs_early                   (cfg_cs_early                 ),
-	.cfg_cs_late                    (cfg_cs_late                  ),
+	    .cfg_cs_early                   (cfg_cs_early                 ),
+	    .cfg_cs_late                    (cfg_cs_late                  ),
+	    .cfg_cmd_delay                  (cfg_cmd_delay                ),
 
 	.m0_cmd_fifo_empty              (m0_cmd_fifo_empty            ),
         .m0_cmd_fifo_rd                 (m0_cmd_fifo_rd               ),
