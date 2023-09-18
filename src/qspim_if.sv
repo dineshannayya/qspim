@@ -398,6 +398,9 @@ always_comb begin
    endcase
 end
 
+/*****************
+  Re-create the actual Byte address based on wbd_sel_i
+******************/
 always_comb begin
    cfg_m0_addr = {spim_wb_addr[31:2],2'b00};
    if(wbd_we_i == 0) begin // Read case
