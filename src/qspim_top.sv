@@ -121,34 +121,37 @@
 ////            B. Bug Fix: Made sure that CS de-assert start only after SPI clock in idle state       ////
 ////            C. added a 4 bit register to add delay between back-back command                       ////
 ////            D. Bug Fix: Added Support for partital byte based write access                         ////
+////     1.9 -  Sept 17, 2023, Dinesh A                                                                ////
+////            A. As different SPI speed grade sharing same core. we have added supported from two    ////
+////               different spi clock configuartion.                                                  ////
 ////                                                                                                   ////
 ////                                                                                                   ////
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////
-////                                                              ////
-//// Copyright (C) 2000 Authors and OPENCORES.ORG                 ////
-////                                                              ////
-//// This source file may be used and distributed without         ////
-//// restriction provided that this copyright statement is not    ////
-//// removed from the file and that any derivative work contains  ////
-//// the original copyright notice and the associated disclaimer. ////
-////                                                              ////
-//// This source file is free software; you can redistribute it   ////
-//// and/or modify it under the terms of the GNU Lesser General   ////
-//// Public License as published by the Free Software Foundation; ////
-//// either version 2.1 of the License, or (at your option) any   ////
-//// later version.                                               ////
-////                                                              ////
-//// This source is distributed in the hope that it will be       ////
-//// useful, but WITHOUT ANY WARRANTY; without even the implied   ////
-//// warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR      ////
-//// PURPOSE.  See the GNU Lesser General Public License for more ////
-//// details.                                                     ////
-////                                                              ////
-//// You should have received a copy of the GNU Lesser General    ////
-//// Public License along with this source; if not, download it   ////
-//// from http://www.opencores.org/lgpl.shtml                     ////
-////                                                              ////
-//////////////////////////////////////////////////////////////////////
+////                                                                                                   ////
+//// Copyright (C) 2000 Authors and OPENCORES.ORG                                                      ////
+////                                                                                                   ////
+//// This source file may be used and distributed without                                              ////
+//// restriction provided that this copyright statement is not                                         ////
+//// removed from the file and that any derivative work contains                                       ////
+//// the original copyright notice and the associated disclaimer.                                      ////
+////                                                                                                   ////
+//// This source file is free software; you can redistribute it                                        ////
+//// and/or modify it under the terms of the GNU Lesser General                                        ////
+//// Public License as published by the Free Software Foundation;                                      ////
+//// either version 2.1 of the License, or (at your option) any                                        ////
+//// later version.                                                                                    ////
+////                                                                                                   ////
+//// This source is distributed in the hope that it will be                                            ////
+//// useful, but WITHOUT ANY WARRANTY; without even the implied                                        ////
+//// warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR                                           ////
+//// PURPOSE.  See the GNU Lesser General Public License for more                                      ////
+//// details.                                                                                          ////
+////                                                                                                   ////
+//// You should have received a copy of the GNU Lesser General                                         ////
+//// Public License along with this source; if not, download it                                        ////
+//// from http://www.opencores.org/lgpl.shtml                                                          ////
+////                                                                                                   ////
+///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /*******************************************************************
      strap_flash [1:0] - QSPI Flash Mode Selection for CS#0
@@ -215,7 +218,8 @@ module qspim_top
   parameter P_QDDR   = 2'b11;
 
    
-    logic                   [7:0] spi_clk_div      ;
+	logic                   [7:0] g0_spi_clk_div      ;
+    logic                   [7:0] g1_spi_clk_div      ;
 
     // Master 0 Configuration
     // Direct Memory CS# Address Mapping
@@ -512,7 +516,8 @@ qspim_regs
 
 	    .cfg_fast_sim                   (cfg_fast_sim                 ),
 
-        .spi_clk_div                    (spi_clk_div                  ),
+        .g0_spi_clk_div                 (g0_spi_clk_div               ),
+        .g1_spi_clk_div                 (g1_spi_clk_div               ),
 	    .spi_init_done                  (spi_init_done                ),
 
         .spi_debug                      (spi_debug                    ),
@@ -661,7 +666,8 @@ qspim_ctrl #(.CMD_FIFO_WD(CMD_FIFO_WD)) u_spictrl
         .clk                            (mclk                         ),
         .rstn                           (rst_ss_n                     ),
 
-        .spi_clk_div                    (spi_clk_div                  ),
+        .g0_spi_clk_div                 (g0_spi_clk_div               ),
+        .g1_spi_clk_div                 (g1_spi_clk_div               ),
         .spi_status                     (spi_ctrl_status              ),
 
 

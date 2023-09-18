@@ -89,6 +89,7 @@ module qspim_clkgen
     output logic                        spi_clk_idle  // Indicate SPI clock in idle phase
 );
 
+	logic [5:0] cfg_sck_period_r;
 	logic [5:0] sck_half_period;
 	logic [5:0] clk_cnt;
 
@@ -130,29 +131,38 @@ module qspim_clkgen
     	   clk_cnt    <= 'h1;
 	       spi_fall   <= 1'b0;
 	       spi_rise   <= 1'b0;
+           cfg_sck_period_r <= 'h0;
     	end // if (!reset_n)
     	else 
     	begin
-    	   if(clk_cnt == sck_half_period) 
-    	   begin
+          cfg_sck_period_r <= cfg_sck_period;
+          // if there is no change in sck clock, then do normal operation
+          if(cfg_sck_period_r == cfg_sck_period) begin 
+    	     if(clk_cnt == sck_half_period) 
+    	     begin
+	            spi_fall   <= 1'b0;
+	            spi_rise   <= 1'b1;
+    	        clk_cnt    <= clk_cnt + 1'b1;
+    	     end // if (clk_cnt == sck_half_period)
+    	     else begin
+    	        if(clk_cnt == cfg_sck_period) 
+    	        begin
+	               spi_fall   <= 1'b1;
+	               spi_rise   <= 1'b0;
+    	           clk_cnt    <= 'h1;
+    	        end // if (clk_cnt == cfg_sck_period)
+    	        else 
+    	        begin
+    	           clk_cnt    <= clk_cnt + 1'b1;
+	               spi_fall   <= 1'b0;
+	               spi_rise   <= 1'b0;
+    	         end // else: !if(clk_cnt == cfg_sck_period)
+    	     end // else: !if(clk_cnt == sck_half_period)
+           end else begin // if there is change in sck_period, then reset counter
+    	      clk_cnt    <= 'h1;
 	          spi_fall   <= 1'b0;
-	          spi_rise   <= 1'b1;
-    	      clk_cnt    <= clk_cnt + 1'b1;
-    	   end // if (clk_cnt == sck_half_period)
-    	   else begin
-    	      if(clk_cnt == cfg_sck_period) 
-    	      begin
-	             spi_fall   <= 1'b1;
-	             spi_rise   <= 1'b0;
-    	         clk_cnt    <= 'h1;
-    	      end // if (clk_cnt == cfg_sck_period)
-    	      else 
-    	      begin
-    	         clk_cnt    <= clk_cnt + 1'b1;
-	             spi_fall   <= 1'b0;
-	             spi_rise   <= 1'b0;
-    	       end // else: !if(clk_cnt == cfg_sck_period)
-    	   end // else: !if(clk_cnt == sck_half_period)
+	          spi_rise   <= 1'b0;
+           end
     	end // else: !if(!reset_n)
     end // always @ (posedge clk or negedge reset_n)
 

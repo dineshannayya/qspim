@@ -85,7 +85,8 @@ module qspim_regs #( parameter WB_WIDTH = 32, parameter CMD_FIFO_WD = 40) (
 
     input logic                          cfg_fast_sim    , // Set 1 for simulation
 
-    output logic                   [7:0] spi_clk_div      ,
+    output logic                   [7:0] g0_spi_clk_div      ,
+    output logic                   [7:0] g1_spi_clk_div      ,
     output logic                         spi_init_done    , // SPI internal Init completed
 
     // Status Monitoring
@@ -507,8 +508,9 @@ end
 
       cfg_cs_early         <= 'h1;
       cfg_cs_late          <= 'h1;
-      cfg_cmd_delay        <= 'h4;
-      spi_clk_div          <= 'h2;
+      cfg_cmd_delay        <= 'h1;
+      g0_spi_clk_div       <= 'h2;
+      g1_spi_clk_div       <= 'h2;
 
       spi_init_done         <=  'h0;
       spi_delay_cnt         <= 'h0;
@@ -712,7 +714,10 @@ end
                 cfg_cmd_delay <= spim_reg_wdata[7:4];
              end
              if ( spim_reg_be[1] == 1 ) begin
-                spi_clk_div <= spim_reg_wdata[15:8];
+                g0_spi_clk_div <= spim_reg_wdata[15:8];
+             end
+             if ( spim_reg_be[2] == 1 ) begin
+                g1_spi_clk_div <= spim_reg_wdata[23:16];
              end
              if ( spim_reg_be[3] == 1 ) begin
                cfg_dpft_dis         <= spim_reg_wdata[30];
@@ -874,9 +879,8 @@ end
       reg_rdata = '0;
       if(spim_reg_req) begin
           case(spim_reg_addr)
-            GLBL_CTRL:         reg_rdata[31:0] = {cfg_m0_fsm_reset,cfg_dpft_dis,10'h0,
-		                                  {res_fifo_full,res_fifo_empty,cmd_fifo_full,cmd_fifo_empty},
-						  spi_clk_div,cfg_cmd_delay,cfg_cs_late,cfg_cs_early};
+            GLBL_CTRL:         reg_rdata[31:0] = {cfg_m0_fsm_reset,cfg_dpft_dis,{res_fifo_full,cmd_fifo_full},
+						  g1_spi_clk_div,g0_spi_clk_div,cfg_cmd_delay,cfg_cs_late,cfg_cs_early};
 	    DMEM_CS0_RD_CTRL:  reg_rdata[31:0] = {cfg_m0_g0_rd_spi_seq   ,cfg_m0_g0_rd_dummy_cnt,cfg_m0_g0_rd_addr_cnt,
 		                                  cfg_m0_g0_rd_spi_switch,cfg_m0_g0_rd_spi_fmode,cfg_m0_g0_rd_spi_imode,
 						  cfg_m0_g0_rd_mode_reg  ,cfg_m0_g0_rd_cmd_reg};

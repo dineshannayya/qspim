@@ -69,7 +69,8 @@ module qspim_ctrl  #(
     input  logic                          clk,
     input  logic                          rstn,
 
-    input  logic                    [7:0] spi_clk_div,
+    input  logic                    [7:0] g0_spi_clk_div,
+    input  logic                    [7:0] g1_spi_clk_div,
     output logic                    [9:0] spi_status,
 
     // Master 0 Configuration
@@ -84,14 +85,14 @@ module qspim_ctrl  #(
     input  logic [CMD_FIFO_WD-1:0]       m0_cmd_fifo_rdata,
 
     // Master 0 response FIFO Interface
-    output logic 	                 m0_res_fifo_flush,
+    output logic 	                     m0_res_fifo_flush,
     input  logic                         m0_res_fifo_empty,
     input  logic                         m0_res_fifo_full,
     output logic                         m0_res_fifo_wr,
     output logic [31:0]                  m0_res_fifo_wdata,
 
     // Master 1 Command FIFO Interface
-    output logic 	                 m1_res_fifo_flush,
+    output logic 	                     m1_res_fifo_flush,
     input  logic                         m1_cmd_fifo_empty,
     output logic                         m1_cmd_fifo_rd,
     input  logic [CMD_FIFO_WD-1:0]       m1_cmd_fifo_rdata,
@@ -195,6 +196,7 @@ parameter P_FSM_CR     = 4'b1100;  // COMMAND -> READ
   logic spi_rise;
   logic spi_fall;
   logic spi_clk_idle; // Indicate SPI clock in idle phase
+  logic [7:0] spi_clk_div;
 
   logic spi_clock_en;
 
@@ -228,6 +230,7 @@ parameter P_FSM_CR     = 4'b1100;  // COMMAND -> READ
   logic [3:0]  cnt; // counter for cs assertion and de-assertion
   logic [3:0]  nxt_cnt;
   logic [1:0]  gnt;
+
 
   logic  [11:0] cfg_data_cnt    ;
   logic  [3:0] cfg_dummy_cnt   ;
@@ -317,7 +320,19 @@ parameter P_FSM_CR     = 4'b1100;  // COMMAND -> READ
 
   assign spi_clock_en =  tx_clk_en |  rx_clk_en;
 
-  assign spi_en_tx_out  = (spi_en_tx) && (spi_dummy ==0); // Don't Drive Tx On Dummy Phase
+
+  // Map the SPI clock divider based on chip select
+  // As some of the Device Access delay are different, we have given support for 
+  // two different speed device support
+  always_comb begin
+      case(cfg_cs_reg)
+      4'b0001 : spi_clk_div = g0_spi_clk_div;
+      4'b0010 : spi_clk_div = g0_spi_clk_div;
+      4'b0100 : spi_clk_div = g1_spi_clk_div;
+      4'b1000 : spi_clk_div = g1_spi_clk_div;
+      default : spi_clk_div = g0_spi_clk_div;
+      endcase
+  end
 
   qspim_clkgen u_clkgen
   (
@@ -649,6 +664,8 @@ parameter P_FSM_CR     = 4'b1100;  // COMMAND -> READ
       FSM_CLK_IDLE: begin
        spi_status[8] = 1'b1;
        nxt_cnt          = 0;
+         if(spi_en_tx_out) // If current transaction, then extend the tx drive phase 
+            spi_en_tx        = 1'b1;
 	     if(spi_clk_idle) next_state  = FSM_CS_DEASEERT;
       end
 
@@ -695,17 +712,19 @@ end
       cfg_spi_imode   <= 'h0;
       cfg_spi_fmode   <= 'h0;
       cfg_spi_switch  <= 'h0;
+      spi_en_tx_out   <= 1'b0;
     end else begin
+       spi_en_tx_out  <= spi_en_tx && (spi_dummy ==0); // Don't Drive Tx On Dummy Phase
        if(state == FSM_IDLE) begin
            if(!m0_cmd_fifo_empty) begin
               cfg_data_cnt    <= m0_cmd_fifo_rdata[47:36];
               cfg_dummy_cnt   <= m0_cmd_fifo_rdata[35:32];
               cfg_addr_cnt    <= m0_cmd_fifo_rdata[31:30];
-	      cfg_spi_switch  <= m0_cmd_fifo_rdata[29:28];
+	          cfg_spi_switch  <= m0_cmd_fifo_rdata[29:28];
               cfg_spi_fmode   <= m0_cmd_fifo_rdata[27:26];
               cfg_spi_imode   <= m0_cmd_fifo_rdata[25:24];
               cfg_spi_seq     <= m0_cmd_fifo_rdata[23:20];
-	      cfg_cs_reg      <= m0_cmd_fifo_rdata[19:16];
+	          cfg_cs_reg      <= m0_cmd_fifo_rdata[19:16];
               spi_mode_cmd    <= m0_cmd_fifo_rdata[15:8];
               gnt             <= 2'b01;
            end

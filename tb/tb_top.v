@@ -200,43 +200,44 @@ parameter P_FLASH_DDRFR   = 8'h0D;  // DDR Read
 parameter P_FLASH_DDRDIOR = 8'hBD;  // DDR Dual I/O Read
 parameter P_FLASH_DDRQIOR = 8'hED;  // DDR Quad I/O Read
 
-	reg clock;
-	reg wb_rst_i;
+	reg         clock;
+	reg         wb_rst_i;
 
-        reg        wbd_ext_cyc_i;  // strobe/request
-        reg        wbd_ext_stb_i;  // strobe/request
-        reg [31:0] wbd_ext_adr_i;  // address
-        reg        wbd_ext_we_i;   // write
-        reg        wbd_ext_bry_i;  // Busrt Ready
-        reg [9:0]  wbd_ext_bl_i;   // Burst Length
-        reg [31:0] wbd_ext_dat_i;  // data output
-        reg [3:0]  wbd_ext_sel_i;  // byte enable
+    reg         wbd_ext_cyc_i;  // strobe/request
+    reg         wbd_ext_stb_i;  // strobe/request
+    reg [31:0]  wbd_ext_adr_i;  // address
+    reg         wbd_ext_we_i;   // write
+    reg         wbd_ext_bry_i;  // Busrt Ready
+    reg [9:0]   wbd_ext_bl_i;   // Burst Length
+    reg [31:0]  wbd_ext_dat_i;  // data output
+    reg [3:0]   wbd_ext_sel_i;  // byte enable
 
-        wire [31:0] wbd_ext_dat_o;  // data input
-        wire        wbd_ext_ack_o;  // acknowlegement
-        wire        wbd_ext_lack_o;  // acknowlegement
-        wire        wbd_ext_err_o;  // error
+    wire [31:0] wbd_ext_dat_o;  // data input
+    wire        wbd_ext_ack_o;  // acknowlegement
+    wire        wbd_ext_lack_o;  // acknowlegement
+    wire        wbd_ext_err_o;  // error
 
 	reg [31:0]  data_array [0 : 511]; // Data Array
 	reg         test_fail;
-	reg [31:0] read_data;
+	reg [31:0]  read_data;
 
     reg  [1:0]  strap_flash;
     reg         strap_sram;
     reg         strap_pre_sram;
 
-        wire flash_clk;
-        wire [3:0] spi_csb;
-        wire [3:0] spi_sdo;
-        wire [3:0] spi_oeb;
-        wire [3:0] io_oeb;
-        tri  flash_io0;
-        tri  flash_io1;
-        tri  flash_io2;
-        tri  flash_io3;
-        wire [3:0] spi_sdi ;
+    wire        flash_clk;
+    wire [3:0]  spi_csb;
+    wire [3:0]  spi_sdo;
+    wire [3:0]  spi_oeb;
+    wire [3:0]  io_oeb;
+    tri         flash_io0;
+    tri         flash_io1;
+    tri         flash_io2;
+    tri         flash_io3;
+    wire [3:0]  spi_sdi ;
 
-	reg [7:0] cnt;
+	reg [7:0]   cnt;
+    reg[7:0]    step;
 
 	// External clock is used by default.  Make this artificially fast for the
 	// simulation.  Normally this would be a slow clock and the digital PLL
@@ -245,7 +246,8 @@ parameter P_FLASH_DDRQIOR = 8'hED;  // DDR Quad I/O Read
 	always #12.5ns clock <= (clock === 1'b0);
 
 	initial begin
-		clock = 0;
+                step=0;
+		        clock = 0;
                 wbd_ext_cyc_i ='h0;  // strobe/request
                 wbd_ext_stb_i ='h0;  // strobe/request
                 wbd_ext_adr_i ='h0;  // address
@@ -278,6 +280,7 @@ parameter P_FLASH_DDRQIOR = 8'hED;  // DDR Quad I/O Read
 		$display("############################################################");
 		$display("  Flash System Strap Testing....Step-1: strap_flash:P_SINGLE ");
 		$display("############################################################");
+        step=1;
         #1000 wb_rst_i = 1;
         #1000 strap_flash = P_SINGLE;
               strap_pre_sram  = S_SINGLE;
@@ -311,6 +314,7 @@ parameter P_FLASH_DDRQIOR = 8'hED;  // DDR Quad I/O Read
 		$display("############################################################");
 		$display("  Flash System Strap Testing....Step-2: strap_flash:P_DOUBLE ");
 		$display("############################################################");
+        step=2;
         #1000 wb_rst_i = 1;
         #1000 strap_flash = P_DOUBLE;
               strap_pre_sram  = S_SINGLE;
@@ -344,6 +348,7 @@ parameter P_FLASH_DDRQIOR = 8'hED;  // DDR Quad I/O Read
 		$display("############################################################");
 		$display("  Flash System Strap Testing....Step-3: strap_flash:P_QUAD ");
 		$display("############################################################");
+        step=3;
 	     repeat (200) @(posedge clock);
         #1000 wb_rst_i = 1;
         #1000 strap_flash = P_QUAD;
@@ -378,6 +383,7 @@ parameter P_FLASH_DDRQIOR = 8'hED;  // DDR Quad I/O Read
         $display("############################################################");
 		$display("  Flash System Strap Testing....Step-4: strap_flash:P_QDDR ");
 		$display("############################################################");
+        step=4;
 	     repeat (200) @(posedge clock);
         #1000 wb_rst_i = 1;
         #1000 strap_flash = P_QDDR;
@@ -412,6 +418,7 @@ parameter P_FLASH_DDRQIOR = 8'hED;  // DDR Quad I/O Read
         $display("############################################################");
 		$display("  SRAM System Strap Testing....Step-1: strap_flash:S_SINGLE ");
 		$display("############################################################");
+        step=5;
 	     repeat (200) @(posedge clock);
         #1000 wb_rst_i = 1;
         #1000 strap_flash = P_QDDR;
@@ -434,6 +441,7 @@ parameter P_FLASH_DDRQIOR = 8'hED;  // DDR Quad I/O Read
         $display("############################################################");
 		$display("  SRAM System Strap Testing....Step-2: strap_sram:S_QUAD ");
 		$display("############################################################");
+        step=6;
 	     repeat (200) @(posedge clock);
         #1000 wb_rst_i = 1;
         #1000 strap_flash     = P_QDDR;
@@ -456,6 +464,7 @@ parameter P_FLASH_DDRQIOR = 8'hED;  // DDR Quad I/O Read
         $display("############################################################");
 		$display("  SRAM System Strap Testing....Step-3: strap_sram:S_SINGLE ");
 		$display("############################################################");
+        step=7;
 	     repeat (200) @(posedge clock);
         #1000 wb_rst_i = 1;
         #1000 strap_flash     = P_QDDR;
@@ -482,6 +491,7 @@ parameter P_FLASH_DDRQIOR = 8'hED;  // DDR Quad I/O Read
 
        //------------------ End of Strap Testing ------------------------------------------
 
+        step=8;
 	     repeat (200) @(posedge clock);
         #1000 wb_rst_i = 1;
         #1000 strap_flash = P_QDDR;
@@ -495,9 +505,13 @@ parameter P_FLASH_DDRQIOR = 8'hED;  // DDR Quad I/O Read
 		//wb_user_core_write(`QSPIM_IMEM_CTRL2,{8'h0,2'b00,2'b00,P_FSM_C,8'h00,8'hFF});
 		//wb_user_core_write(`QSPIM_IMEM_WDATA,32'h0);
 
+        // Setting G0 Spiclock div-2 and G1 SPI clock div-4
+		wb_user_core_write(`QSPIM_GLBL_CTRL,{16'h0, 8'h04,8'h2,4'h4,2'b01,2'b01});
+
         $display("############################################################");
 		$display("  CS#2 SRAM INDIRECT READ ACCESS in SSPI Mode              ");
 		$display("############################################################");
+        step=9;
 	        repeat (200) @(posedge clock);
 		// CS#2 SSPI Indirect RAM READ ACCESS-
 		wb_user_core_write(`QSPIM_IMEM_CTRL1,{16'h0,1'b0,1'b0,4'b0000,P_MODE_SWITCH_IDLE,P_SINGLE,P_SINGLE,4'b0100});
@@ -542,6 +556,7 @@ parameter P_FLASH_DDRQIOR = 8'hED;  // DDR Quad I/O Read
         $display("############################################################");
 		$display("  CS#2 SRAM INDIRECT READ ACCESS in QSPI Mode              ");
 		$display("############################################################");
+        step=10;
 		// CS#2 Switch to QSPI Mode
 		wb_user_core_write(`QSPIM_IMEM_CTRL1,{16'h0,1'b0,1'b0,4'b0000,P_MODE_SWITCH_IDLE,P_SINGLE,P_SINGLE,4'b0100});
 		wb_user_core_write(`QSPIM_IMEM_CTRL2,{8'h0,2'b00,2'b00,P_FSM_C,8'h00,8'h38});
@@ -575,6 +590,7 @@ parameter P_FLASH_DDRQIOR = 8'hED;  // DDR Quad I/O Read
 		$display("#############################################");
 		$display("  CS#2: Page Read through Direct Burst Access in SSPI Mode       ");
 		$display("#############################################");
+        step=11;
 		wb_user_core_write(`QSPIM_DMEM_G1_WR_CTRL,{P_FSM_CAW, 4'b0000,2'b10,P_MODE_SWITCH_IDLE,P_SINGLE,P_SINGLE,8'h00,8'h02});
 		wb_user_core_write(`QSPIM_DMEM_G1_RD_CTRL,{P_FSM_CADR,4'b0000,2'b10,P_MODE_SWITCH_IDLE,P_SINGLE,P_SINGLE,8'h00,8'h03});
 
@@ -598,6 +614,7 @@ parameter P_FLASH_DDRQIOR = 8'hED;  // DDR Quad I/O Read
 		$display("#############################################");
 		$display("  Page Read through Direct Burst Access in QSPI Mode       ");
 		$display("#############################################");
+        step=12;
 		// CS#1 Switch to QSPI Mode
 		wb_user_core_write(`QSPIM_IMEM_CTRL1,{16'h0,1'b0,1'b0,4'b0000,P_MODE_SWITCH_IDLE,P_SINGLE,P_SINGLE,4'b0100});
 		wb_user_core_write(`QSPIM_IMEM_CTRL2,{8'h0,2'b00,2'b00,P_FSM_C,8'h00,8'h38});
@@ -639,6 +656,7 @@ parameter P_FLASH_DDRQIOR = 8'hED;  // DDR Quad I/O Read
 		$display("#############################################");
 		$display("  Read Identification (RDID:0x9F)            ");
 		$display("#############################################");
+        step=13;
 		wb_user_core_write(`QSPIM_IMEM_CTRL1,{16'h0,1'b0,1'b0,4'b0000,2'b00,P_SINGLE,P_SINGLE,4'b0001});
 		wb_user_core_write(`QSPIM_IMEM_CTRL2,{8'h4,2'b00,2'b00,P_FSM_CR,8'h00,8'h9F});
 		wb_user_core_read_check(`QSPIM_IMEM_RDATA,read_data,32'h00190201);
@@ -672,6 +690,7 @@ parameter P_FLASH_DDRQIOR = 8'hED;  // DDR Quad I/O Read
 		$display("Prefetch : 1DW, OPCODE:READ(0x3)            ");
 		$display("SEQ: Command -> Address -> Read Data        ");
 		$display("#############################################");
+        step=14;
 		wb_user_core_write(`QSPIM_DMEM_G0_RD_CTRL,{P_FSM_CAR,4'b0000,2'b10,P_MODE_SWITCH_IDLE,P_SINGLE,P_SINGLE,8'h00,8'h03});
 		wb_user_core_read_check(32'h00000200,read_data,32'h00000093);
 		wb_user_core_read_check(32'h00000204,read_data,32'h00000113);
@@ -695,6 +714,7 @@ parameter P_FLASH_DDRQIOR = 8'hED;  // DDR Quad I/O Read
 		$display("Prefetch : 1DW, OPCODE:FASTREAD(0xB)        ");
 		$display("SEQ: Command -> Address -> Dummy -> Read Data");
 		$display("#############################################");
+        step=15;
 		wb_user_core_write(`QSPIM_DMEM_G0_RD_CTRL,{P_FSM_CADR,4'b0000,2'b10,P_MODE_SWITCH_IDLE,P_SINGLE,P_SINGLE,8'h00,8'h0B});
 		wb_user_core_read_check(32'h00000200,read_data,32'h00000093);
 		wb_user_core_read_check(32'h00000204,read_data,32'h00000113);
@@ -719,6 +739,7 @@ parameter P_FLASH_DDRQIOR = 8'hED;  // DDR Quad I/O Read
 		$display("Prefetch : 1DW, OPCODE:DOR(0x3B)        ");
 		$display("SEQ: Command -> Address -> Dummy -> Read Data");
 		$display("#############################################");
+        step=16;
 		wb_user_core_write(`QSPIM_DMEM_G0_RD_CTRL,{P_FSM_CADR,4'b0000,2'b10,P_MODE_SWITCH_AT_DATA,P_DOUBLE,P_SINGLE,8'h00,8'h3B});
 		wb_user_core_read_check(32'h00000200,read_data,32'h00000093);
 		wb_user_core_read_check(32'h00000204,read_data,32'h00000113);
@@ -743,6 +764,7 @@ parameter P_FLASH_DDRQIOR = 8'hED;  // DDR Quad I/O Read
 		$display("Prefetch : 8DW, OPCODE:URAD READ(0xEB)      ");
 		$display("SEQ: Command -> Address -> Dummy -> Read Data");
 		$display("#############################################");
+        step=17;
 		wb_user_core_write(`QSPIM_DMEM_G0_RD_CTRL,{P_FSM_CAMDR,4'b0001,2'b10,P_MODE_SWITCH_AT_ADDR,P_QUAD,P_SINGLE,8'h00,8'hEB});
 		wb_user_core_read_check(32'h00000200,read_data,32'h00000093);
 		wb_user_core_read_check(32'h00000204,read_data,32'h00000113);
@@ -764,6 +786,7 @@ parameter P_FLASH_DDRQIOR = 8'hED;  // DDR Quad I/O Read
 		$display("#############################################");
 		$display("Testing Direct SPI Memory Read with Prefetch:3DW");
 		$display("#############################################");
+        step=18;
 		wb_user_core_write(`QSPIM_DMEM_G0_RD_CTRL,{P_FSM_CAMDR,4'b0001,2'b10,P_MODE_SWITCH_AT_ADDR,P_QUAD,P_SINGLE,8'h00,8'hEB});
 		wb_user_core_read_check(32'h00000200,read_data,32'h00000093);
 		wb_user_core_read_check(32'h00000204,read_data,32'h00000113);
@@ -785,6 +808,7 @@ parameter P_FLASH_DDRQIOR = 8'hED;  // DDR Quad I/O Read
 		$display("#############################################");
 		$display("Testing Direct SPI Memory Read with Prefetch:2DW");
 		$display("#############################################");
+        step=19;
 		wb_user_core_write(`QSPIM_DMEM_G0_RD_CTRL,{P_FSM_CAMDR,4'b0001,2'b10,P_MODE_SWITCH_AT_ADDR,P_QUAD,P_SINGLE,8'h00,8'hEB});
 		wb_user_core_read_check(32'h00000200,read_data,32'h00000093);
 		wb_user_core_read_check(32'h00000204,read_data,32'h00000113);
@@ -807,6 +831,7 @@ parameter P_FLASH_DDRQIOR = 8'hED;  // DDR Quad I/O Read
 		$display("#############################################");
 		$display("Testing Direct SPI Memory Read with Prefetch:1DW");
 		$display("#############################################");
+        step=20;
 		wb_user_core_write(`QSPIM_DMEM_G0_RD_CTRL,{P_FSM_CAMDR,4'b0001,2'b10,P_MODE_SWITCH_AT_ADDR,P_QUAD,P_SINGLE,8'h00,8'hEB});
 		wb_user_core_read_check(32'h00000200,read_data,32'h00000093);
 		wb_user_core_read_check(32'h00000204,read_data,32'h00000113);
@@ -828,6 +853,7 @@ parameter P_FLASH_DDRQIOR = 8'hED;  // DDR Quad I/O Read
 		$display("#############################################");
 		$display("Testing Direct SPI Memory Read with Prefetch:7DW");
 		$display("#############################################");
+        step=21;
 		wb_user_core_write(`QSPIM_DMEM_G0_RD_CTRL,{P_FSM_CAMDR,4'b0001,2'b10,P_MODE_SWITCH_AT_ADDR,P_QUAD,P_SINGLE,8'h00,8'hEB});
 		wb_user_core_read_check(32'h00000200,read_data,32'h00000093);
 		wb_user_core_read_check(32'h00000204,read_data,32'h00000113);
@@ -849,6 +875,7 @@ parameter P_FLASH_DDRQIOR = 8'hED;  // DDR Quad I/O Read
 		$display("#############################################");
 		$display("  Testing Single Word Indirect SPI Memory Read");
 		$display("#############################################");
+        step=22;
 		wb_user_core_write(`QSPIM_IMEM_CTRL1,{16'h0,1'b0,1'b0,4'b0001,P_MODE_SWITCH_AT_ADDR,P_QUAD,P_SINGLE,4'b0001});
 		wb_user_core_write(`QSPIM_IMEM_CTRL2,{8'h4,2'b00,2'b10,P_FSM_CAMDR,8'h00,8'hEB});
 		wb_user_core_write(`QSPIM_IMEM_ADDR,32'h00000200);
@@ -887,6 +914,7 @@ parameter P_FLASH_DDRQIOR = 8'hED;  // DDR Quad I/O Read
 		$display("#############################################");
 		$display("  Testing Two Word Indirect SPI Memory Read");
 		$display("#############################################");
+        step=23;
 		wb_user_core_write(`QSPIM_IMEM_CTRL1,{16'h0,1'b0,1'b0,4'b0001,P_MODE_SWITCH_AT_ADDR,P_QUAD,P_SINGLE,4'b0001});
 		wb_user_core_write(`QSPIM_IMEM_CTRL2,{8'h8,2'b00,2'b10,P_FSM_CAMDR,8'h00,8'hEB});
 		wb_user_core_write(`QSPIM_IMEM_ADDR,32'h00000200);
@@ -917,6 +945,7 @@ parameter P_FLASH_DDRQIOR = 8'hED;  // DDR Quad I/O Read
 		$display("#############################################");
 		$display("  Testing Three Word Indirect SPI Memory Read");
 		$display("#############################################");
+        step=24;
 		wb_user_core_write(`QSPIM_IMEM_CTRL1,{16'h0,1'b0,1'b0,4'b0001,P_MODE_SWITCH_AT_ADDR,P_QUAD,P_SINGLE,4'b0001});
 		wb_user_core_write(`QSPIM_IMEM_CTRL2,{8'hC,2'b00,2'b10,P_FSM_CAMDR,8'h00,8'hEB});
 		wb_user_core_write(`QSPIM_IMEM_ADDR,32'h00000200);
@@ -939,6 +968,7 @@ parameter P_FLASH_DDRQIOR = 8'hED;  // DDR Quad I/O Read
 		$display("#############################################");
 		$display("  Testing Four Word Indirect SPI Memory Read");
 		$display("#############################################");
+        step=25;
 		wb_user_core_write(`QSPIM_IMEM_CTRL1,{16'h0,1'b0,1'b0,4'b0001,P_MODE_SWITCH_AT_ADDR,P_QUAD,P_SINGLE,4'b0001});
 		wb_user_core_write(`QSPIM_IMEM_CTRL2,{8'h10,2'b00,2'b10,P_FSM_CAMDR,8'h00,8'hEB});
 		wb_user_core_write(`QSPIM_IMEM_ADDR,32'h00000200);
@@ -965,6 +995,7 @@ parameter P_FLASH_DDRQIOR = 8'hED;  // DDR Quad I/O Read
 		$display("#############################################");
 		$display("  Testing Five Word Indirect SPI Memory Read");
 		$display("#############################################");
+        step=26;
 		wb_user_core_write(`QSPIM_IMEM_CTRL1,{16'h0,1'b0,1'b0,4'b0001,P_MODE_SWITCH_AT_ADDR,P_QUAD,P_SINGLE,4'b0001});
 		wb_user_core_write(`QSPIM_IMEM_CTRL2,{8'h14,2'b00,2'b10,P_FSM_CAMDR,8'h00,8'hEB});
 		wb_user_core_write(`QSPIM_IMEM_ADDR,32'h00000200);
@@ -982,6 +1013,7 @@ parameter P_FLASH_DDRQIOR = 8'hED;  // DDR Quad I/O Read
 		$display("#############################################");
 		$display("  Testing Eight Word Indirect SPI Memory Read");
 		$display("#############################################");
+        step=27;
 		wb_user_core_write(`QSPIM_IMEM_CTRL1,{16'h0,1'b0,1'b0,4'b0001,P_MODE_SWITCH_AT_ADDR,P_QUAD,P_SINGLE,4'b0001});
 		wb_user_core_write(`QSPIM_IMEM_CTRL2,{8'h20,2'b00,2'b10,P_FSM_CAMDR,8'h00,8'hEB});
 		wb_user_core_write(`QSPIM_IMEM_ADDR,32'h00000200);
@@ -1006,6 +1038,7 @@ parameter P_FLASH_DDRQIOR = 8'hED;  // DDR Quad I/O Read
 		$display("#############################################");
 		$display("  Sector Erase Command            ");
 		$display("#############################################");
+        step=28;
 		// WEN COMMAND
 		wb_user_core_write(`QSPIM_IMEM_CTRL1,{16'h0,1'b0,1'b0,4'b0000,P_MODE_SWITCH_IDLE,P_SINGLE,P_SINGLE,4'b0001});
 		wb_user_core_write(`QSPIM_IMEM_CTRL2,{8'h0,2'b00,2'b00,P_FSM_C,8'h00,8'h06});
@@ -1028,6 +1061,7 @@ parameter P_FLASH_DDRQIOR = 8'hED;  // DDR Quad I/O Read
 		$display("#############################################");
 		$display("  Page Write Command Address: 0x00          ");
 		$display("#############################################");
+        step=29;
 		// WEN COMMAND
 		wb_user_core_write(`QSPIM_IMEM_CTRL1,{16'h0,1'b0,1'b0,4'b0000,P_MODE_SWITCH_IDLE,P_SINGLE,P_SINGLE,4'b0001});
 		wb_user_core_write(`QSPIM_IMEM_CTRL2,{8'h0,2'b00,2'b00,P_FSM_C,8'h00,8'h06});
@@ -1109,6 +1143,7 @@ parameter P_FLASH_DDRQIOR = 8'hED;  // DDR Quad I/O Read
 		$display("#############################################");
 		$display("  Page Read through Direct Access            ");
 		$display("#############################################");
+        step=30;
 
 		wb_user_core_read_check(32'h00000000,read_data,32'h00010000);
 		wb_user_core_read_check(32'h00000004,read_data,32'h00010001);
@@ -1175,6 +1210,7 @@ parameter P_FLASH_DDRQIOR = 8'hED;  // DDR Quad I/O Read
 		$display("#############################################");
 		$display("  Page Read through Indirect Access           ");
 		$display("#############################################");
+        step=31;
 		wb_user_core_write(`QSPIM_IMEM_CTRL1,{16'h0,1'b0,1'b0,4'b0001,P_MODE_SWITCH_AT_ADDR,P_QUAD,P_SINGLE,4'b0001});
 		wb_user_core_write(`QSPIM_IMEM_CTRL2,{8'hF0,2'b00,2'b10,P_FSM_CAMDR,8'h00,8'hEB});
 		wb_user_core_write(`QSPIM_IMEM_ADDR,32'h00000000);
@@ -1244,6 +1280,7 @@ parameter P_FLASH_DDRQIOR = 8'hED;  // DDR Quad I/O Read
 		$display("#############################################");
 		$display("  Page Write Command Address: 0x200          ");
 		$display("#############################################");
+        step=32;
 		// WEN COMMAND
 		wb_user_core_write(`QSPIM_IMEM_CTRL1,{16'h0,1'b0,1'b0,4'b0000,P_MODE_SWITCH_IDLE,P_SINGLE,P_SINGLE,4'b0001});
 		wb_user_core_write(`QSPIM_IMEM_CTRL2,{8'h0,2'b00,2'b00,P_FSM_C,8'h00,8'h06});
@@ -1325,6 +1362,7 @@ parameter P_FLASH_DDRQIOR = 8'hED;  // DDR Quad I/O Read
 		$display("#############################################");
 		$display("  Page Read through Direct Access            ");
 		$display("#############################################");
+        step=33;
 
 		wb_user_core_read_check(32'h00000200,read_data,32'h00020000);
 		wb_user_core_read_check(32'h00000204,read_data,32'h00020001);
@@ -1391,6 +1429,7 @@ parameter P_FLASH_DDRQIOR = 8'hED;  // DDR Quad I/O Read
 		$display("#############################################");
 		$display("  Page Read through Indirect Access           ");
 		$display("#############################################");
+        step=34;
 		wb_user_core_write(`QSPIM_IMEM_CTRL1,{16'h0,1'b0,1'b0,4'b0001,P_MODE_SWITCH_AT_ADDR,P_QUAD,P_SINGLE,4'b0001});
 		wb_user_core_write(`QSPIM_IMEM_CTRL2,{8'hF0,2'b00,2'b10,P_FSM_CAMDR,8'h00,8'hEB});
 		wb_user_core_write(`QSPIM_IMEM_ADDR,32'h00000200);
@@ -1459,6 +1498,7 @@ parameter P_FLASH_DDRQIOR = 8'hED;  // DDR Quad I/O Read
 		$display("#############################################");
 		$display("  Page Read through Direct Burst Access       ");
 		$display("#############################################");
+        step=35;
 
 		data_array[10'h0]    = 32'h00010000;
 		data_array[10'h1]    = 32'h00010001;
@@ -1590,9 +1630,10 @@ parameter P_FLASH_DDRQIOR = 8'hED;  // DDR Quad I/O Read
 		$display("#############################################");
 		$display("  clock config validation in SSPI Mode       ");
 		$display("#############################################");
+        step=36;
 		for(cnt = 4; cnt < 16; cnt = cnt+2) begin
 		    $display("SPI Testing with Clock Div value: %x ",cnt);
-		    wb_user_core_write(`QSPIM_GLBL_CTRL,{16'h0, cnt[7:0],4'h4,2'b01,2'b01});
+		    wb_user_core_write(`QSPIM_GLBL_CTRL,{16'h0, cnt[7:0],8'h02,4'h4,2'b01,2'b01});
 
 		    wb_user_core_write(`QSPIM_DMEM_G1_WR_CTRL,{P_FSM_CAW, 4'b0000,2'b10,P_MODE_SWITCH_IDLE,P_SINGLE,P_SINGLE,8'h00,8'h02});
 		    wb_user_core_write(`QSPIM_DMEM_G1_RD_CTRL,{P_FSM_CADR,4'b0000,2'b10,P_MODE_SWITCH_IDLE,P_SINGLE,P_SINGLE,8'h00,8'h03});
@@ -1608,10 +1649,12 @@ parameter P_FLASH_DDRQIOR = 8'hED;  // DDR Quad I/O Read
 		    wb_user_core_bwrite(32'h08000000,10'h8);
 		    wb_user_core_bread_check(32'h08000000,10'h8);
 		 end
+        // Setting G0 Spiclock div-2 and G1 SPI clock div-4
+		wb_user_core_write(`QSPIM_GLBL_CTRL,{16'h0, 8'h04,8'h2,4'h4,2'b01,2'b01});
 		$display("#############################################");
 		$display("  Testing SRAM Byte enable Write Access       ");
 		$display("#############################################");
-		    wb_user_core_write(`QSPIM_GLBL_CTRL,{16'h0, 8'h4,4'h4,2'b01,2'b01});
+        step=37;
 		    wb_user_core_write(`QSPIM_DMEM_G1_WR_CTRL,{P_FSM_CAW, 4'b0000,2'b10,P_MODE_SWITCH_IDLE,P_SINGLE,P_SINGLE,8'h00,8'h02});
 		    wb_user_core_write(`QSPIM_DMEM_G1_RD_CTRL,{P_FSM_CADR,4'b0000,2'b10,P_MODE_SWITCH_IDLE,P_SINGLE,P_SINGLE,8'h00,8'h03});
 
