@@ -124,6 +124,9 @@
 ////     1.9 -  Sept 17, 2023, Dinesh A                                                                ////
 ////            A. As different SPI speed grade sharing same core. we have added supported from two    ////
 ////               different spi clock configuartion.                                                  ////
+////     2.0 -  Oct 20, 2023, Dinesh A                                                                 ////
+////            A. Bug fix in empty during burst access Tx Path                                        ////
+////            B. Bug fix in Full during burst access Rx Path                                         ////
 ////                                                                                                   ////
 ////                                                                                                   ////
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -294,6 +297,7 @@ module qspim_top
     
     // Towards m0 Response FIFO
     logic                         m0_res_fifo_full    ;   // Response FIFO Empty
+    logic                         m0_res_fifo_afull   ;   // Response FIFO Empty
     logic                         m0_res_fifo_empty   ;   // Response FIFO Empty
     logic                         m0_res_fifo_wr      ;   // Response FIFO Write
     logic                         m0_res_fifo_rd      ;   // Response FIFO Read
@@ -302,6 +306,7 @@ module qspim_top
 
     // Towards m1 Command FIFO
     logic                         m1_cmd_fifo_full    ;   // Command FIFO full
+    logic                         m1_cmd_fifo_afull   ;   // Command FIFO about full
     logic                         m1_cmd_fifo_empty   ;   // Command FIFO empty
     logic                         m1_cmd_fifo_wr      ;   // Command FIFO Write
     logic                         m1_cmd_fifo_rd      ;   // Command FIFO Write
@@ -310,6 +315,7 @@ module qspim_top
     
     // Towards m0 Response FIFO
     logic                         m1_res_fifo_full    ;   // Response FIFO Empty
+    logic                         m1_res_fifo_afull   ;   // Response FIFO Empty
     logic                         m1_res_fifo_empty   ;   // Response FIFO Empty
     logic                         m1_res_fifo_wr      ;   // Response FIFO Read
     logic                         m1_res_fifo_rd      ;   // Response FIFO Read
@@ -620,11 +626,11 @@ qspim_fifo #(.W(CMD_FIFO_WD), .DP(4)) u_m0_cmd_fifo (
 qspim_fifo #(.W(32), .DP(8)) u_m0_res_fifo (
 	 .clk                           (mclk                        ),
          .reset_n                       (rst_ss_n                    ),
-	 .flush                         (m0_res_fifo_flush           ),
+	 .flush                             (m0_res_fifo_flush           ),
          .wr_en                         (m0_res_fifo_wr              ),
          .wr_data                       (m0_res_fifo_wdata           ),
          .full                          (m0_res_fifo_full            ),                 
-         .afull                         (                            ),                 
+         .afull                         (m0_res_fifo_afull           ),                 
          .rd_en                         (m0_res_fifo_rd              ),
          .empty                         (m0_res_fifo_empty           ),                
          .aempty                        (                            ),                
@@ -639,7 +645,7 @@ qspim_fifo #(.W(CMD_FIFO_WD), .DP(4)) u_m1_cmd_fifo (
          .wr_en                         (m1_cmd_fifo_wr              ),
          .wr_data                       (m1_cmd_fifo_wdata           ),
          .full                          (m1_cmd_fifo_full            ),                 
-         .afull                         (                            ),                 
+         .afull                         (m1_cmd_fifo_afull           ),                 
          .rd_en                         (m1_cmd_fifo_rd              ),
          .empty                         (m1_cmd_fifo_empty           ),                
          .aempty                        (                            ),                
@@ -649,11 +655,11 @@ qspim_fifo #(.W(CMD_FIFO_WD), .DP(4)) u_m1_cmd_fifo (
 qspim_fifo #(.W(32), .DP(8)) u_m1_res_fifo (
 	 .clk                           (mclk                        ),
          .reset_n                       (rst_ss_n                    ),
-	 .flush                         (m1_res_fifo_flush           ),
+	 .flush                             (m1_res_fifo_flush           ),
          .wr_en                         (m1_res_fifo_wr              ),
          .wr_data                       (m1_res_fifo_wdata           ),
          .full                          (m1_res_fifo_full            ),                 
-         .afull                         (                            ),                 
+         .afull                         (m1_res_fifo_afull           ),                 
          .rd_en                         (m1_res_fifo_rd              ),
          .empty                         (m1_res_fifo_empty           ),                
          .aempty                        (                            ),                
@@ -682,6 +688,7 @@ qspim_ctrl #(.CMD_FIFO_WD(CMD_FIFO_WD)) u_spictrl
 	.m0_res_fifo_flush              (m0_res_fifo_flush            ),
 	.m0_res_fifo_empty              (m0_res_fifo_empty            ),
 	.m0_res_fifo_full               (m0_res_fifo_full             ),
+	.m0_res_fifo_afull              (m0_res_fifo_afull             ),
 	.m0_res_fifo_wr                 (m0_res_fifo_wr               ),
 	.m0_res_fifo_wdata              (m0_res_fifo_wdata            ),
 
@@ -692,6 +699,7 @@ qspim_ctrl #(.CMD_FIFO_WD(CMD_FIFO_WD)) u_spictrl
 	.m1_res_fifo_flush              (m1_res_fifo_flush            ),
 	.m1_res_fifo_empty              (m1_res_fifo_empty            ),
 	.m1_res_fifo_full               (m1_res_fifo_full             ),
+	.m1_res_fifo_afull              (m1_res_fifo_afull            ),
 	.m1_res_fifo_wr                 (m1_res_fifo_wr               ),
 	.m1_res_fifo_wdata              (m1_res_fifo_wdata            ),
 

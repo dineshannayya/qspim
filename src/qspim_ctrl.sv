@@ -88,6 +88,7 @@ module qspim_ctrl  #(
     output logic 	                     m0_res_fifo_flush,
     input  logic                         m0_res_fifo_empty,
     input  logic                         m0_res_fifo_full,
+    input  logic                         m0_res_fifo_afull,
     output logic                         m0_res_fifo_wr,
     output logic [31:0]                  m0_res_fifo_wdata,
 
@@ -100,6 +101,7 @@ module qspim_ctrl  #(
     // Master 1 response FIFO Interface
     input  logic                         m1_res_fifo_empty,
     input  logic                         m1_res_fifo_full,
+    input  logic                         m1_res_fifo_afull,
     output logic                         m1_res_fifo_wr,
     output logic [31:0]                  m1_res_fifo_wdata,
 
@@ -295,7 +297,7 @@ parameter P_FSM_CR     = 4'b1100;  // COMMAND -> READ
   logic [31:0]       res_fifo_wdata;
 
   assign res_fifo_empty = (gnt == 2'b01) ? m0_res_fifo_empty : m1_res_fifo_empty;
-  assign res_fifo_full  = (gnt == 2'b01) ? m0_res_fifo_full  : m1_res_fifo_full;
+  assign res_fifo_full  = (gnt == 2'b01) ? (m0_res_fifo_full | m0_res_fifo_afull)  : (m1_res_fifo_full | m1_res_fifo_afull) ;
 
   assign m0_res_fifo_wr = (gnt == 2'b01) ? res_fifo_wr : 1'b0;
   assign m1_res_fifo_wr = (gnt == 2'b10) ? res_fifo_wr : 1'b0;

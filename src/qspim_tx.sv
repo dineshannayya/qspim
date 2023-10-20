@@ -129,12 +129,12 @@ module qspim_tx
 
   always_comb
   begin
-    tx_NS         = tx_CS;
-    data_int_next = data_int;
-    data_ready_i    = 1'b0;
+    tx_NS                = tx_CS;
+    data_int_next        = data_int;
+    data_ready_i         = 1'b0;
     next_data_ready_i    = 1'b0;
-    counter_next  = counter;
-    spi_mode_next  =  spi_mode;
+    counter_next         = counter;
+    spi_mode_next        =  spi_mode;
 
     case (tx_CS)
       IDLE: begin
@@ -142,7 +142,7 @@ module qspim_tx
         counter_next  = '0;
 
         if (en && data_valid && tx_edge) begin
-	  spi_mode_next    = s_spi_mode;
+	      spi_mode_next    = s_spi_mode;
           data_ready_i    = 1'b1;
           tx_NS         = TRANSMIT;
         end
@@ -162,11 +162,11 @@ module qspim_tx
                end
          end else if (tx32b_done) begin
                if (en && (spi_dummy || data_valid) && tx_edge) begin
-	         spi_mode_next    = s_spi_mode;
-                 data_int_next = txdata;
+	             spi_mode_next        = s_spi_mode;
+                 data_int_next        = txdata;
                  next_data_ready_i    = 1'b1;
-                 counter_next = counter + 1;
-                 tx_NS         = TRANSMIT;
+                 counter_next         = counter + 1;
+                 tx_NS                = TRANSMIT;
                end else begin
                  tx_NS    = WAIT_FIFO_AVAIL;
                end
@@ -179,10 +179,11 @@ module qspim_tx
       end
       WAIT_FIFO_AVAIL: begin
            if (en && data_valid && tx_edge) begin 
-	     spi_mode_next    = s_spi_mode;
-             data_int_next = txdata;
-             data_ready_i    = 1'b1;
-             tx_NS         = TRANSMIT;
+	         spi_mode_next        = s_spi_mode;
+             data_int_next        = txdata;
+             next_data_ready_i    = 1'b1;
+             counter_next         = counter + 1;
+             tx_NS                = TRANSMIT;
            end 
         end
     endcase
