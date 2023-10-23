@@ -144,17 +144,17 @@ module qspim_rx #(
 
           if (rx_done) begin
                counter_next = 0;
-	       if (data_ready) begin
-                 data_valid_i   = 1'b1;
-                 rx_NS = IDLE;
-	       end else
-                 rx_NS = WAIT_FIFO_DONE;
+	          if (data_ready) begin
+                    data_valid_i   = 1'b1;
+                    rx_NS = IDLE;
+	          end else
+                    rx_NS = WAIT_FIFO_DONE;
           end else if (reg_done) begin
-	    if (data_ready) begin
-              data_valid_i   = 1'b1;
-            end else begin
-              // no space in the FIFO, wait for free space
-              rx_NS    = WAIT_FIFO;
+	         if (data_ready) begin
+                data_valid_i   = 1'b1;
+             end else begin
+                // no space in the FIFO, wait for free space
+                rx_NS    = WAIT_FIFO;
             end
           end
         end
@@ -168,7 +168,7 @@ module qspim_rx #(
       end
 
       WAIT_FIFO: begin
-	 if (data_ready) begin
+	 if (data_ready && rx_edge) begin
             data_valid_i = 1'b1;
             rx_NS = RECEIVE;
 	 end
