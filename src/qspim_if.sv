@@ -269,8 +269,8 @@ always_ff @(negedge rst_n or posedge mclk) begin
 	wbd_stb_l     <= '0;
    end else begin
 	if(spi_init_done) begin // Wait for internal SPI Init Done
-	    wbd_stb_l     <= wbd_stb_i;
-      	    wbd_bl_cnt   <= next_wbd_bl_cnt;
+	    wbd_stb_l    <= wbd_stb_i;
+      	wbd_bl_cnt   <= next_wbd_bl_cnt;
 	    if(wbd_stb_pedge) begin
 	       spim_wb_addr <= wbd_adr_i;
             end else if(spim_mem_ack) begin
