@@ -169,6 +169,7 @@
 
 *********************************************************************/
 
+`include "user_reg_map.v"
 
 module qspim_top
 #( parameter WB_WIDTH = 32,
@@ -200,6 +201,8 @@ module qspim_top
     input  logic   [3:0]                 wbd_sel_i, // byte enable
     input  logic   [9:0]                 wbd_bl_i,  // Burst Length
     input  logic                         wbd_bry_i, // Burst Ready
+
+    output logic   [3:0]                 wbd_sid_o, // slave id
     output logic   [WB_WIDTH-1:0]        wbd_dat_o, // data input
     output logic                         wbd_ack_o, // acknowlegement
     output logic                         wbd_lack_o,// Last acknowlegement
@@ -332,6 +335,9 @@ module qspim_top
     logic [3:0]   m0_state         ;
     logic [3:0]   m1_state         ;
     logic [3:0]   ctrl_state        ;
+
+
+    assign wbd_sid_o  = `WBI_SID_QSPI;
 
 
     assign spi_debug  =   {m0_res_fifo_flush,m1_res_fifo_flush,spi_init_done,
