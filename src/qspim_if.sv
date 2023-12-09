@@ -266,11 +266,11 @@ always_ff @(negedge rst_n or posedge mclk) begin
         spim_wb_addr  <= '0;
         spim_wb_be    <= '0;
         spim_wb_we    <= '0;
-	wbd_stb_l     <= '0;
+	    wbd_stb_l     <= '0;
    end else begin
 	if(spi_init_done) begin // Wait for internal SPI Init Done
         // reset strobe at every last ack
-        if(wbd_lack_o) wbd_stb_l = 1'b0;
+        if(wbd_lack_o) wbd_stb_l <= 1'b0;
 	    else wbd_stb_l    <= wbd_stb_i;
       	wbd_bl_cnt   <= next_wbd_bl_cnt;
 	    if(wbd_stb_pedge) begin
