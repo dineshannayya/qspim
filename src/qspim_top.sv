@@ -127,6 +127,8 @@
 ////     2.0 -  Oct 20, 2023, Dinesh A                                                                 ////
 ////            A. Bug fix in empty during burst access Tx Path                                        ////
 ////            B. Bug fix in Full during burst access Rx Path                                         ////
+////     2.1  - Dec 9, 2023, Dinesh A                                                                  ////
+////            bug fix on back-back stb with address changes sequence                                 ////
 ////                                                                                                   ////
 ////                                                                                                   ////
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////
