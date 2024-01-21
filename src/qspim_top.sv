@@ -1,4 +1,4 @@
-//////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////
 // SPDX-FileCopyrightText: 2021 , Dinesh Annayya                          
 // 
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -171,7 +171,7 @@
 
 *********************************************************************/
 
-`include "user_reg_map.v"
+`include "user_reg_map.svh"
 
 module qspim_top
 #( parameter WB_WIDTH = 32,
@@ -191,8 +191,6 @@ module qspim_top
     input  logic                         cfg_init_bypass, // Bypass initialization
     output logic                         qspim_idle,
 
-    input  logic   [3:0]                 cfg_cska_sp_co, // spi clock skew adjust
-    input  logic   [3:0]                 cfg_cska_spi,
     input  logic                         wbd_clk_int,
     output logic                         wbd_clk_spi,
 
@@ -339,13 +337,6 @@ module qspim_top
     logic [3:0]   ctrl_state        ;
 
 
-    assign wbd_sid_o  = `WBI_SID_QSPI;
-
-
-    assign spi_debug  =   {m0_res_fifo_flush,m1_res_fifo_flush,spi_init_done,
-		          m0_cmd_fifo_full,m0_cmd_fifo_empty,m0_res_fifo_full,m0_res_fifo_empty,
-		          m1_cmd_fifo_full,m1_cmd_fifo_empty,m1_res_fifo_full,m1_res_fifo_empty,
-		          ctrl_state[3:0], m0_state[3:0],m1_state[3:0],spi_ctrl_status[8:0]};
 
 //-------------------------------------------------------
 // SPI Interface moved inside to support carvel IO pad 
@@ -363,6 +354,13 @@ logic                          spi_sdo3_dl;
 logic                          rst_ss_n;
 
 
+    assign wbd_sid_o  = `WBI_SID_QSPI;
+
+
+    assign spi_debug  =   {m0_res_fifo_flush,m1_res_fifo_flush,spi_init_done,
+		          m0_cmd_fifo_full,m0_cmd_fifo_empty,m0_res_fifo_full,m0_res_fifo_empty,
+		          m1_cmd_fifo_full,m1_cmd_fifo_empty,m1_res_fifo_full,m1_res_fifo_empty,
+		          ctrl_state[3:0], m0_state[3:0],m1_state[3:0],spi_ctrl_status[8:0]};
 
 // ADDing Delay cells for Interface hold fix
 wire spi_sdo0_d1,spi_sdo0_d2;
@@ -392,27 +390,25 @@ assign   spi_oen[2] =  ((spi_mode == P_QUAD) || (spi_mode == P_QDDR)) ? !spi_en_
 assign   spi_oen[3] =  ((spi_mode == P_QUAD) || (spi_mode == P_QDDR)) ? !spi_en_tx: 1'b0;   // 
 
 // spi clock skew control
-clk_skew_adjust u_skew_spi
+ctech_clk_buf u_skew_spi
        (
 `ifdef USE_POWER_PINS
                .vccd1      (vccd1                      ),// User area 1 1.8V supply
                .vssd1      (vssd1                      ),// User area 1 digital ground
 `endif
-	       .clk_in     (wbd_clk_int                ), 
-	       .sel        (cfg_cska_spi               ), 
-	       .clk_out    (wbd_clk_spi                ) 
+	       .A     (wbd_clk_int                ), 
+	       .X     (wbd_clk_spi                ) 
        );
 
 // Clock Skey for SPI clock out
-clk_skew_adjust u_skew_sp_co
+ctech_clk_buf u_skew_sp_co
        (
 `ifdef USE_POWER_PINS
                .vccd1      (vccd1                      ),// User area 1 1.8V supply
                .vssd1      (vssd1                      ),// User area 1 digital ground
 `endif
-	       .clk_in     (spi_clk_int                ), 
-	       .sel        (cfg_cska_sp_co             ), 
-	       .clk_out    (spi_clk                    ) 
+	       .A     (spi_clk_int                ), 
+	       .X    (spi_clk                    ) 
        );
 //###################################
 // Application Reset Synchronization
