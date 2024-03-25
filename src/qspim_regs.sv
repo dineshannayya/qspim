@@ -1,76 +1,52 @@
-//////////////////////////////////////////////////////////////////////////////
-// SPDX-FileCopyrightText: 2021 , Dinesh Annayya                          
-// 
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// SPDX-License-Identifier: Apache-2.0
-// SPDX-FileContributor: Created by Dinesh Annayya <dinesha@opencores.org>
-//
-//////////////////////////////////////////////////////////////////////
-////                                                              ////
-////  SPI WishBone Register I/F Module                            ////
-////                                                              ////
-////  This file is part of the YIFive cores project               ////
-////  https://github.com/dineshannayya/yifive_r0.git              ////
-////  http://www.opencores.org/cores/yifive/                      ////
-////                                                              ////
-////  Description                                                 ////
-////     SPI WishBone I/F module                                  ////
-////     This block support following functionality               ////
-////        1. Direct SPI Read memory support for address rang    ////
-////             0x0000 to 0x0FFF_FFFF - Use full for Instruction ////
-////             Data Memory fetch                                ////
-////        2. SPI Local Register Access                          ////
-////        3. Indirect register way to access SPI Memory         ////
-////                                                              ////
-////  To Do:                                                      ////
-////    nothing                                                   ////
-////                                                              ////
-////  Author(s):                                                  ////
-////      - Dinesh Annayya, dinesha@opencores.org                 ////
-////                                                              ////
-////  Revision :                                                  ////
-////     V.0  -  June 8, 2021                                     //// 
-////     V.1  -  Jan 29, 2023                                     ////
-////             As part of MPW-2 Silicon Bring-up noticed        ////
-////             SPI Flash Power Up command (0xAB) need 3 us      ////
-////             delay before the next command                    ////
-////                                                              ////
-//////////////////////////////////////////////////////////////////////
-////                                                              ////
-//// Copyright (C) 2000 Authors and OPENCORES.ORG                 ////
-////                                                              ////
-//// This source file may be used and distributed without         ////
-//// restriction provided that this copyright statement is not    ////
-//// removed from the file and that any derivative work contains  ////
-//// the original copyright notice and the associated disclaimer. ////
-////                                                              ////
-//// This source file is free software; you can redistribute it   ////
-//// and/or modify it under the terms of the GNU Lesser General   ////
-//// Public License as published by the Free Software Foundation; ////
-//// either version 2.1 of the License, or (at your option) any   ////
-//// later version.                                               ////
-////                                                              ////
-//// This source is distributed in the hope that it will be       ////
-//// useful, but WITHOUT ANY WARRANTY; without even the implied   ////
-//// warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR      ////
-//// PURPOSE.  See the GNU Lesser General Public License for more ////
-//// details.                                                     ////
-////                                                              ////
-//// You should have received a copy of the GNU Lesser General    ////
-//// Public License along with this source; if not, download it   ////
-//// from http://www.opencores.org/lgpl.shtml                     ////
-////                                                              ////
-//////////////////////////////////////////////////////////////////////
+/*****************************************************************************************************
+ * Copyright (c) 2024 SiPlusPlus Semiconductor
+ *
+ * FileContributor: Dinesh Annayya <dinesha@opencores.org>                       
+ * FileContributor: Dinesh Annayya <dinesh@siplusplus.com>                       
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ ***************************************************************************************************/
+/****************************************************************************************************
+                                                                  
+      SPI WishBone Register I/F Module                            
+                                                                  
+                                                                  
+      Description                                                 
+         SPI WishBone I/F module                                  
+         This block support following functionality               
+            1. Direct SPI Read memory support for address rang    
+                 0x0000 to 0x0FFF_FFFF - Use full for Instruction 
+                 Data Memory fetch                                
+            2. SPI Local Register Access                          
+            3. Indirect register way to access SPI Memory         
+                                                                  
+      To Do:                                                      
+        nothing                                                   
+                                                                  
+      Author(s):                                                  
+          - Dinesh Annayya <dinesha@opencores.org>               
+          - Dinesh Annayya <dinesh@siplusplus.com>               
+                                                                  
+      Revision :                                                  
+         V.0  -  June 8, 2021, Dinesh A                                      
+         V.1  -  Jan 29, 2023, Dinesh A                                     
+                 As part of MPW-2 Silicon Bring-up noticed        
+                 SPI Flash Power Up command (0xAB) need 3 us      
+                 delay before the next command                    
+         v.2  -  Mar 21, 2024, Dinesh A
+                 As Flash Busy status after WRR command is interms of ms, we have added Readback Status check
+                                                                  
+ ***************************************************************************************************/
 
 
 module qspim_regs #( parameter WB_WIDTH = 32, parameter CMD_FIFO_WD = 40) (
@@ -229,7 +205,9 @@ parameter SPI_INIT_WRR_CMD      = 4'b0110;
 parameter SPI_INIT_WRR_WAIT     = 4'b0111;
 parameter SPI_SRAM_STRAP_CHECK  = 4'b1000;
 parameter SPI_SRAM_ESQI_WAIT    = 4'b1001;
-parameter SPI_INIT_WAIT         = 4'b1010;
+parameter SPI_INIT_RDSR1_CMD    = 4'b1010;
+parameter SPI_RDSR1_READ_WAIT   = 4'b1011;
+parameter SPI_INIT_WAIT         = 4'b1100;
 
 /*************************************************************
 *  SPI FSM State Control
@@ -306,6 +284,7 @@ parameter P_FSM_CR     = 4'b1100;  // COMMAND -> READ
   parameter P_FLASH_RES = 8'hAB;
   parameter P_FLASH_WEN = 8'h06;
   parameter P_FLASH_WRR = 8'h01;
+  parameter P_FLASH_RDSR1 = 8'h05;
 
   parameter P_SRAM_READ  = 8'h03;
   parameter P_SRAM_WRITE = 8'h02;
@@ -350,8 +329,8 @@ logic [7:0]          cfg_m1_mode_reg  ; // SPI MODE REG
 logic [31:0]         cfg_m1_addr      ;
 logic [31:0]         cfg_m1_wdata     ;
 logic [31:0]         cfg_m1_rdata     ;
-logic                cfg_m1_wrdy      ;
-logic                cfg_m1_req       ;
+logic                cfg_m1_wreq      ;
+logic                cfg_m1_rreq      ;
 
 logic [31:0]         reg_rdata        ;
 
@@ -502,15 +481,15 @@ end
       cfg_m1_addr_cnt[1:0]  <= P_BYTE_3;
       cfg_m1_dummy_cnt[3:0] <= P_BYTE_1;
       cfg_m1_data_cnt[7:0]  <= 0;
-      cfg_m1_req            <= 0; 
-      cfg_m1_wrdy           <= 1'b0;
+      cfg_m1_wreq           <= 0; 
+      cfg_m1_rreq           <= 0; 
       cfg_m1_wdata          <= 'h0; // Not Used
 
       cfg_cs_early         <= 'h1;
       cfg_cs_late          <= 'h1;
       cfg_cmd_delay        <= 'h1;
-      g0_spi_clk_div       <= 'h2;
-      g1_spi_clk_div       <= 'h2;
+      g0_spi_clk_div       <= 'h2; // Flash Memory works upto 100Mhz
+      g1_spi_clk_div       <= 'h4; // SRAM memory range is 16 to 20Mhz
 
       spi_init_done         <=  'h0;
       spi_delay_cnt         <= 'h0;
@@ -562,13 +541,13 @@ end
                  cfg_m1_data_cnt[7:0] <= 'h0; // Not Used
                  cfg_m1_addr          <= 'h0; // Not Used
                  cfg_m1_wdata         <= 'h0; // Not Used
-                 cfg_m1_req           <= 'h1;
+                 cfg_m1_wreq          <= 'h1;
                  spi_init_state       <=  SPI_POWERUP_CMD_WAIT;
               end
               SPI_POWERUP_CMD_WAIT:
               begin
                  if(spim_m1_ack)   begin
-                    cfg_m1_req       <= 1'b0;
+                    cfg_m1_wreq      <= 1'b0;
                     spi_delay_cnt    <= 'h0;
                     spi_init_state   <=  SPI_POWERUP_CMD_DELAY;
                  end
@@ -597,13 +576,13 @@ end
                  cfg_m1_data_cnt[7:0] <= 'h0; // Not Used
                  cfg_m1_addr          <= 'h0; // Not Used
                  cfg_m1_wdata         <= 'h0; // Not Used
-                 cfg_m1_req           <= 'h1;
+                 cfg_m1_wreq          <= 'h1;
                  spi_init_state       <=  SPI_INIT_WREN_WAIT;
               end
               SPI_INIT_WREN_WAIT:
               begin
                  if(spim_m1_ack)   begin
-                    cfg_m1_req      <= 1'b0;
+                    cfg_m1_wreq      <= 1'b0;
                     //---------------------------------------------------------
                     // For SPI FLASH Memory QUAD and QDDR Mode, we need to enable
                     // enable set cr1[1] = 1 to enable. So we need configure it
@@ -629,20 +608,21 @@ end
                  cfg_m1_dummy_cnt[3:0]<= 'h0; 
                  cfg_m1_data_cnt[7:0] <= 'h2; // 2 Bytes
                  cfg_m1_addr          <= 'h0; 
-                 cfg_m1_wrdy          <= 1'b1;
                  cfg_m1_wdata         <= {16'h0,8'h2,8'h0}; // <<cr1[7:0]><sr1[7:0]>> cr1[1] = 1 indicate quad mode cr1[7:6]=3 
-                 cfg_m1_req           <= 'h1;
+                 cfg_m1_wreq          <= 'h1;
                  spi_init_state       <=  SPI_INIT_WRR_WAIT;
               end
               SPI_INIT_WRR_WAIT:
               begin
                  if(spim_m1_ack)   begin
 		            spi_delay_cnt    <= 'h0;
-                    cfg_m1_wrdy      <= 1'b0;
-                    cfg_m1_req       <= 1'b0;
+                    cfg_m1_wreq      <= 1'b0;
                     spi_init_state   <=  SPI_SRAM_STRAP_CHECK;
                  end
               end
+
+
+
               SPI_SRAM_STRAP_CHECK: // Check SRAM STRAP
               begin
                  //-----------------------------------------------------------------------
@@ -661,9 +641,8 @@ end
                     cfg_m1_dummy_cnt[3:0]<= 'h0; 
                     cfg_m1_data_cnt[7:0] <= 'h0; 
                     cfg_m1_addr          <= 'h0; 
-                    cfg_m1_wrdy          <= 1'b1;
                     cfg_m1_wdata         <= 'h0; 
-                    cfg_m1_req           <= 'h1;
+                    cfg_m1_wreq          <= 'h1;
                     spi_init_state       <=  SPI_SRAM_ESQI_WAIT;
                  end else if(strap_pre_sram == 1'b1 && strap_sram == 1'b0) begin 
                    // If PRE_STRAP=QUAD and STRAP=SINGLE, then we need RSTDQI command
@@ -678,23 +657,58 @@ end
                     cfg_m1_dummy_cnt[3:0]<= 'h0; 
                     cfg_m1_data_cnt[7:0] <= 'h0; 
                     cfg_m1_addr          <= 'h0; 
-                    cfg_m1_wrdy          <= 1'b1;
                     cfg_m1_wdata         <= 'h0; 
-                    cfg_m1_req           <= 'h1;
+                    cfg_m1_wreq          <= 'h1;
                     spi_init_state       <=  SPI_SRAM_ESQI_WAIT;
                  end else begin
-                    spi_init_state       <=  SPI_INIT_WAIT;
+                    spi_init_state       <=  SPI_INIT_RDSR1_CMD;
                  end
               end
               SPI_SRAM_ESQI_WAIT:
               begin
                  if(spim_m1_ack)   begin
 		            spi_delay_cnt    <= 'h0;
-                    cfg_m1_wrdy      <= 1'b0;
-                    cfg_m1_req       <= 1'b0;
-                    spi_init_state   <=  SPI_INIT_WAIT;
+                    cfg_m1_wreq      <= 1'b0;
+                    spi_init_state   <=  SPI_INIT_RDSR1_CMD;
                  end
               end
+
+
+              // After Flash WRR Command, Device Busy will be '1' for more than 40ms
+              // Read the status to check Flash is not Busy
+
+              SPI_INIT_RDSR1_CMD:
+              begin
+                 cfg_m1_cs_reg        <= P_CS0;
+                 cfg_m1_spi_imode     <= P_SINGLE;
+                 cfg_m1_spi_fmode     <= P_SINGLE;
+                 cfg_m1_spi_seq[3:0]  <= P_FSM_CR;
+                 cfg_m1_spi_switch    <= '0;
+                 cfg_m1_cmd_reg       <= P_FLASH_RDSR1;
+                 cfg_m1_mode_reg      <= 'h0; 
+                 cfg_m1_addr_cnt[1:0] <= 'h0; 
+                 cfg_m1_dummy_cnt[3:0]<= 'h0; 
+                 cfg_m1_data_cnt[7:0] <= 'h1; // 1 Bytes
+                 cfg_m1_addr          <= 'h0; 
+                 cfg_m1_wdata         <= 'h0;
+                 cfg_m1_wreq          <= 'h1;
+                 cfg_m1_rreq          <= 'h1;
+                 spi_init_state       <=  SPI_RDSR1_READ_WAIT;
+              end
+              SPI_RDSR1_READ_WAIT:
+              begin
+                 if(spim_m1_rrdy)   begin
+		            spi_delay_cnt    <= 'h0;
+                    cfg_m1_wreq       <= 1'b0;
+                    cfg_m1_rreq       <= 1'b0;
+                    if(cfg_m1_rdata[25:24] == 2'b00) begin // check busy is not set
+                       spi_init_state   <=  SPI_INIT_WAIT;
+                    end else begin // Read the Status once again
+                       spi_init_state   <=  SPI_INIT_RDSR1_CMD;
+                    end
+                 end
+              end
+
               SPI_INIT_WAIT:
               begin // SPI MEMORY need 5us after WRR Command
                    if(spi_delay_cnt == cfg_exit_cnt) begin
@@ -933,9 +947,9 @@ logic [31:0] spim_fifo_wdata;
 logic       spim_fifo_req;
 assign cfg_data_cnt = cfg_m1_data_cnt-1;
 
-assign spim_fifo_req = cfg_m1_req || spim_fifo_rdata_req || spim_fifo_wdata_req;
+assign spim_fifo_req = cfg_m1_wreq || cfg_m1_rreq || spim_fifo_rdata_req || spim_fifo_wdata_req;
 
-assign spim_fifo_wdata = (cfg_m1_req) ?  cfg_m1_wdata :  spim_reg_wdata;
+assign spim_fifo_wdata = (cfg_m1_wreq) ?  cfg_m1_wdata :  spim_reg_wdata;
 
 always_comb
 begin
@@ -1050,7 +1064,7 @@ begin
    // Check Resonse FIFO is not empty then read the data from response fifo
    // ---------------------------------------------------------
    FSM_READ_PHASE: begin
-	if(res_fifo_empty != 1 && spim_fifo_rdata_req) begin
+	if(res_fifo_empty != 1 && (cfg_m1_rreq || spim_fifo_rdata_req)) begin
 	   spim_m1_rrdy = 1;
            cfg_m1_rdata = res_fifo_rdata;
 	   res_fifo_rd  = 1;
