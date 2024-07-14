@@ -85,6 +85,9 @@ module qspim_fifo (clk,
 
    reg [W-1 : 0]    mem[DP-1 : 0];
 
+   reg [AW:0] rd_ptr;
+
+
    /*********************** write side ************************/
    reg [AW:0] wr_ptr;
    reg full_q;
@@ -130,7 +133,6 @@ module qspim_fifo (clk,
 
 
    /************************ read side *****************************/
-   reg [AW:0] rd_ptr;
    reg empty_q;
    wire empty_c;
    wire aempty_c;
